@@ -190,18 +190,16 @@ The browser suite changes mock scenarios and checks topology selection, diagnost
 
 ## Interactive Three.js cell
 
-Open `http://127.0.0.1:8000/dashboard/demo/` after starting the bridge, or use **Interactive 3D cell** in the dashboard header. WebGL 2 is required. Three.js 0.180.0 and the OrbitControls/STLLoader addons are bundled locally with their MIT license; the demo needs no CDN, npm install, or build step.
+Open `http://127.0.0.1:8000/dashboard/demo/` after starting the bridge, or use **Interactive 3D cell** in the dashboard header. WebGL 2 is required. Three.js 0.180.0 and the OrbitControls/STLLoader addons are bundled locally with their MIT license; no CDN, npm install, or build step is needed.
 
-- Orbit by dragging, zoom by scrolling, and select a component to read about it. Camera buttons focus the whole cell, rack/device, or conveyor.
-- **Explode enclosure** separates the two actual repository STL meshes. The PCB, rack, mounting, conveyor, and laptop are illustrative; enclosure assembly placement is a visualization rather than a manufacturing constraint solver.
-- **Run conveyor** loads the new additive `conveyor_running` mock scenario (25 raw current units = 2.5 A, clear sensor, healthy safety chain, no fault).
-- **Introduce a jam** loads the existing `conveyor_jam` scenario. The box stops at an illustrative obstruction, the photoeye turns red, and the bridge reports 9.5 A, fault 601, and a fault latch. This visualization is not a physics simulation or measured motion.
-- **Clear & reset demo** loads `idle`. It does not issue a physical Reset_Command.
-- **Open connected software** embeds the actual dashboard, sharing the same backend state. The laptop screen in the scene is a simplified canvas display of those values.
-- Polls `/api/state` every 1.5 seconds. Scenario controls are disabled for unavailable or non-mock data; there is no automatic mock fallback. Reduced-motion preference suppresses conveyor animation. The existing firmware and physical PLC behavior are unchanged.
+The scene contains the enclosure, PLC rack and conveyor only. Orbit by dragging, zoom by scrolling, and select components or camera views. **Explode enclosure** separates the actual repository STL meshes. Assuming STL units are millimeters, the enclosure bounds are approximately 46 × 55 × 72 mm. One scene unit represents 200 mm, so the conveyor is approximately 1.38 m long. The board, rack, mounting and other equipment are illustrative rather than manufacturer-verified models.
 
-Frontend model and Python contract tests include the healthy-running scenario. The interactive demo has also been checked in-browser for CAD loading, run/jam/reset transitions, the shared dashboard, enclosure inspection, desktop/mobile layout, and browser errors.
+### From symptom to inspection
 
-### Guided jam investigation
+- **Run conveyor** loads `conveyor_running` (2.5 A, clear photoeye, healthy safety feedback, no fault).
+- **Introduce hidden drag** loads the existing `conveyor_jam` register scenario (9.5 A, blocked photoeye, fault 601). There is no visible barrier or angled guide. The carton stops while the mechanical cause stays concealed.
+- The right-side investigation uses the combination of signals to suggest checking mechanical resistance while retaining alternative explanations. It does not identify a bearing from register values alone.
+- **Perform simulated drive-train inspection** reveals an authored finding: one roller bearing binds under load. Only then does an amber bearing marker appear. This is not measured bearing telemetry or an automatic root-cause conclusion.
+- **Simulate roller service + reset** loads idle. Running again verifies the demo recovery: 2.5 A, clear photoeye, fault 000. Resetting the demo does not issue a hardware Reset_Command or perform a physical repair.
 
-When the demo receives the conveyor-jam signals, a right-side investigation panel explains how a shifted side guide can cause repeated jams even after a carton is removed. It explicitly distinguishes the illustrative cause from sensor evidence: the bridge has no guide-position measurement. Inspecting the suspected guide highlights it in amber and enables a simulated correction/reset. Running the conveyor afterward verifies the mock recovery (2.5 A, clear photoeye, fault 000). The panel is unavailable for physical PLC sources or missing telemetry; no hardware repair or write is performed. The exaggerated barrier has been replaced by an angled guide section. Desktop controls scroll independently so the scene remains visible.
+The scene polls `/api/state` every 1.5 seconds and shares mock scenarios with the separate dashboard. Controls are disabled for unavailable/non-mock data; there is no automatic mock fallback. Reduced-motion preference suppresses conveyor animation. Physical motion, binding and inspection findings are illustrative; firmware and PLC behavior are unchanged. Browser validation covers CAD loading, the run/drag/inspect/service/restart workflow and the absence of the laptop/embedded dashboard. The existing frontend and Python contract tests also cover telemetry and static serving.

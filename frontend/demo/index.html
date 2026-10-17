@@ -27,7 +27,7 @@
         <div class="scene-title">
           <div class="eyebrow">FROM FIELD SIGNAL TO FAULT DIAGNOSIS</div>
           <h1>A small device.<br />A clearer picture.</h1>
-          <p>Explore the hardware. Run the conveyor. Trace the jam.</p>
+          <p>Nothing obvious is blocking it. Find the next useful check.</p>
         </div>
         <div
           id="stage"
@@ -53,16 +53,16 @@
         <div class="selection">
           <span id="part-label" class="eyebrow">LOGICLATCH DEVICE</span>
           <p id="part-info">
-            The enclosure uses the actual repository STL models. ESP32
-            independently polls the PLC; its readings are not exposed to this
-            dashboard.
+            Actual STL enclosure: approximately 46 × 55 × 72 mm, assuming
+            millimeter units. Scene scale: 1 unit = 200 mm; conveyor ≈ 1.38 m
+            long. ESP32 readings remain unobserved.
           </p>
         </div>
       </section>
       <aside class="console">
         <div class="console-head">
           <div class="eyebrow">LIVE BRIDGE / DEMO CONTROLS</div>
-          <h2>See why it stopped.</h2>
+          <h2>From symptom to next step.</h2>
           <p id="connection-message" role="status">
             Waiting for the existing FastAPI bridge.
           </p>
@@ -73,65 +73,74 @@
           hidden
           aria-label="Guided fault investigation"
         >
-          <div class="eyebrow">FAULT 601 / GUIDED INVESTIGATION</div>
-          <h3>Clearing the box may not fix the cause.</h3>
+          <div class="eyebrow">LOGICLATCH / FIND THE NEXT CHECK</div>
+          <h3>The path looks clear. Why is it stopping?</h3>
           <p class="repair-summary">
-            A guide can shift inward and pinch each new box. The photoeye then
-            stays blocked because product cannot pass—not necessarily because
-            the sensor failed.
+            A stopped box and a blocked photoeye do not tell you which component
+            failed. LogicLatch connects the signals to help you choose the next
+            useful check.
           </p>
           <div class="hypothesis">
-            <b>DEMO CAUSE · NOT SENSOR-CONFIRMED</b>
+            <b>OBSERVED SIGNALS → WORKING HYPOTHESIS</b>
             <p>
-              Misaligned side guide at the discharge. Current and blockage
-              support a mechanical restriction, but cannot identify its exact
-              location.
+              Motor commanded on + high current + product not clearing the
+              photoeye. Investigate mechanical resistance before replacing the
+              sensor. A drive fault or bad current reading still needs to be
+              ruled out.
             </p>
           </div>
           <ol class="repair-checks">
             <li>
-              <b>Make the cell safe</b
+              <b>Compare the clues</b
+              ><span
+                >A photoeye issue could explain “blocked,” but not by itself the
+                elevated motor current. Safety_OK is reported healthy; that
+                signal is not permission to access the mechanism.</span
+              >
+            </li>
+            <li>
+              <b>Inspect safely beyond the visible box</b
               ><span
                 >For real equipment, stop and isolate hazardous energy using the
-                site procedure before reaching in or adjusting a guide.</span
+                site procedure. Qualified maintenance should check roller drag,
+                belt tracking and drive condition against the equipment
+                instructions. Do not reach into a running conveyor.</span
               >
             </li>
             <li>
-              <b>Distinguish sensor trouble from drag</b
+              <b>Test a hypothesis—not an alarm number</b
               ><span
-                >A blocked input alone could be a photoeye issue. Here, the
-                running command and 9.5 A current also indicate load. Check for
-                a pinched carton, guide rub marks or a binding roller.</span
-              >
-            </li>
-            <li>
-              <b>Check the guide—not just the box</b
-              ><span
-                >Compare the guide gap and alignment with the approved setup. In
-                this demo the discharge guide has drifted inward; simply
-                removing the box leaves the restriction.</span
-              >
-            </li>
-            <li>
-              <b>Correct, then prove recovery</b
-              ><span
-                >Restore the approved guide position and secure its mounting.
-                Follow the site restart procedure. Verify clear photoeye, normal
-                running current and no recurring timeout.</span
+                >Look for a roller that resists rotation or other evidence of
+                binding. The existing registers cannot distinguish a bearing
+                problem from belt or drive resistance.</span
               >
             </li>
           </ol>
-          <button id="inspect-guide">Inspect suspected guide in 3D ↗</button>
-          <p id="inspection-result" hidden>
-            The amber guide is the scenario’s assumed cause. The backend has no
-            guide-position sensor, so this highlight is an illustration—not a
-            measured diagnosis.
-          </p>
+          <button id="inspect-drive">
+            Perform simulated drive-train inspection ↗
+          </button>
+          <div id="inspection-result" hidden>
+            <b>DEMO INSPECTION FINDING</b>
+            <p>
+              One roller bearing binds under load. The conveyor looks
+              unobstructed, but extra drag prevents the box from clearing the
+              photoeye. The highlighted bearing is an authored demo finding—not
+              measured bearing telemetry.
+            </p>
+            <p>
+              <b>Next action:</b> qualified maintenance should service or
+              replace the affected roller/bearing per the equipment
+              instructions, then verify free movement and alignment before
+              following the site restart procedure. Clearing the box or
+              resetting the alarm alone leaves the cause.
+            </p>
+          </div>
           <button id="repair-demo" disabled>
-            Simulate guide correction + reset
+            Simulate roller service + reset
           </button>
           <p id="repair-result" role="status">
-            Resetting a fault alone does not correct a mechanical restriction.
+            Use the evidence to narrow the search; verify the cause before
+            changing parts.
           </p>
         </section>
         <div class="steps">
@@ -139,8 +148,8 @@
             <span>01</span><b>Run conveyor</b
             ><small>Healthy motion · 2.5 A</small></button
           ><button id="jam" disabled>
-            <span>02</span><b>Introduce a jam</b
-            ><small>Blocked photoeye · overload</small></button
+            <span>02</span><b>Introduce hidden drag</b
+            ><small>No visible obstruction · high load</small></button
           ><button id="clear" disabled>
             <span>03</span><b>Clear & reset demo</b
             ><small>Return to healthy idle</small>
@@ -151,7 +160,7 @@
             <span>MACHINE STATE</span><strong id="state">Unavailable</strong>
           </div>
           <div><span>MOTOR CURRENT</span><strong id="amps">—</strong></div>
-          <div><span>FAULT CODE</span><strong id="code">—</strong></div>
+          <div><span>BACKEND REFERENCE</span><strong id="code">—</strong></div>
         </div>
         <div class="signal-list">
           <div><span>Photoeye</span><b id="sensor">—</b></div>
@@ -164,9 +173,6 @@
           <p id="diagnosis-text">No fallback readings are generated.</p>
           <div id="evidence"></div>
         </div>
-        <button id="software" class="software">
-          Open connected software ↓
-        </button>
         <div class="fine-print">
           SIMULATED CELL · Controls change backend mock scenarios for all
           viewers. 3D motion and the physical jam are illustrative, not measured
@@ -174,19 +180,6 @@
         </div>
       </aside>
     </main>
-    <section id="software-panel" hidden>
-      <div class="software-header">
-        <div>
-          <span class="eyebrow">THE SAME SIGNALS. THE SAME BACKEND.</span>
-          <h2>LogicLatch operator dashboard</h2>
-        </div>
-        <button id="close-software">Close dashboard ×</button>
-      </div>
-      <iframe
-        id="dashboard-frame"
-        title="Connected LogicLatch operator dashboard"
-      ></iframe>
-    </section>
     <script type="module" src="demo.js"></script>
   </body>
 </html>

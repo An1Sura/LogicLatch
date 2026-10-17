@@ -15,7 +15,7 @@ const view = { update() {}, focus() {}, explode() {} };
 const info = {
   device: [
     "LOGICLATCH / ACTUAL CAD",
-    "Base and lid are loaded from the repository’s STL files. ESP32 independently polls the PLC over WiFi; it does not supply telemetry to the Python bridge. Mounting and assembly are illustrative.",
+    "Actual STL enclosure: approximately 46 × 55 × 72 mm, assuming millimeter CAD units. One scene unit represents 200 mm (conveyor length ≈ 1.38 m). The internal board and mounting are illustrative. ESP32 telemetry is unobserved.",
   ],
   plc: [
     "CODESYS PLC / MODBUS TCP",
@@ -24,10 +24,6 @@ const info = {
   conveyor: [
     "CONVEYOR / MOTOR + PHOTOEYE",
     "A running command, blocked sensor and motor current of at least 8.0 A trigger the bridge’s jam rule. The 3D box position is illustrative, not measured telemetry.",
-  ],
-  laptop: [
-    "LOGICLATCH / SOFTWARE",
-    "The operator dashboard reads the same FastAPI backend as this 3D view. Open connected software to inspect all registers and the exact diagnostic findings.",
   ],
 };
 function selectPart(key) {
@@ -44,7 +40,7 @@ async function request(path, options = {}) {
   return response.json();
 }
 let repairStage = "none",
-  guideInspected = false,
+  driveInspected = false,
   previousJam = false;
 function renderState() {
   const ok = usable(state),
@@ -71,17 +67,17 @@ function renderState() {
     repairStage = "none";
   if (jam && repairStage !== "fault") {
     repairStage = "fault";
-    guideInspected = false;
+    driveInspected = false;
   }
   if (!mock) {
     repairStage = "none";
-    guideInspected = false;
+    driveInspected = false;
   }
   $("repair-panel").hidden =
     !mock || (!jam && !["corrected", "verified"].includes(repairStage));
-  $("inspect-guide").disabled = !jam || busy;
-  $("repair-demo").disabled = !jam || !guideInspected || busy;
-  $("inspection-result").hidden = !guideInspected;
+  $("inspect-drive").disabled = !jam || busy;
+  $("repair-demo").disabled = !jam || !driveInspected || busy;
+  $("inspection-result").hidden = !driveInspected;
   if (
     repairStage === "corrected" &&
     ok &&
@@ -95,7 +91,7 @@ function renderState() {
     repairStage === "verified"
       ? "DEMO RECOVERY VERIFIED: running at 2.5 A, photoeye clear, fault 000. This confirms the mock scenario only, not a physical repair."
       : repairStage === "corrected"
-        ? "Demo guide restored; backend is idle. Click Run conveyor to verify 2.5 A, clear photoeye and fault 000."
+        ? "Demo roller serviced; backend is idle. Click Run conveyor to verify 2.5 A, clear photoeye and fault 000."
         : "Resetting a fault alone does not correct a mechanical restriction.";
   $("repair-panel").classList.toggle("recovered", repairStage === "verified");
   $("source-badge").textContent = !state
@@ -135,7 +131,7 @@ function renderState() {
   $("diagnosis-title").textContent = !ok
     ? "Telemetry unavailable"
     : jam
-      ? "Conveyor jam or overload"
+      ? "High load with no product progress"
       : r.System_Fault_Latch
         ? state.active_fault_name
         : r.Conveyor_Running
@@ -144,7 +140,7 @@ function renderState() {
   $("diagnosis-text").textContent = !ok
     ? "The 3D motion is paused. No fallback readings are invented."
     : jam
-      ? "The motor is commanded on, but the photoeye stays blocked and current is high. These signals satisfy the bridge’s jam rule. The scene illustrates a box caught against a guide."
+      ? "The motor is commanded on, but the photoeye stays blocked and current is high. These signals satisfy the bridge’s jam rule. A hidden drive-train restriction is one possibility; these signals do not identify the failed part."
       : r.System_Fault_Latch
         ? "Another backend scenario is active. Open the dashboard to inspect its diagnostic findings."
         : r.Conveyor_Running
@@ -214,19 +210,19 @@ $("run").onclick = () => setScenario("conveyor_running");
 $("jam").onclick = () => setScenario("conveyor_jam");
 $("clear").onclick = () => {
   repairStage = "none";
-  guideInspected = false;
+  driveInspected = false;
   setScenario("idle");
 };
-$("inspect-guide").onclick = () => {
-  guideInspected = true;
+$("inspect-drive").onclick = () => {
+  driveInspected = true;
   view.focus("conveyor");
   selectPart("conveyor");
   $("part-info").textContent =
-    "DEMO HYPOTHESIS: the amber discharge guide has shifted inward, pinching the carton. Inspect alignment and clearance; a blocked photoeye alone does not prove a failed sensor.";
+    "SIMULATED INSPECTION: one roller bearing resists rotation. The amber marker appears only after inspection. This finding is authored for the demo, not inferred from a bearing sensor.";
   renderState();
 };
 $("repair-demo").onclick = async () => {
-  if (!guideInspected || busy || !usable(state) || state.source !== "mock")
+  if (!driveInspected || busy || !usable(state) || state.source !== "mock")
     return;
   await setScenario("idle");
   if (
@@ -257,18 +253,6 @@ for (const button of document.querySelectorAll("[data-camera]"))
       .querySelectorAll("[data-camera]")
       .forEach((b) => b.classList.toggle("selected", b === button));
   };
-$("software").onclick = () => {
-  const panel = $("software-panel");
-  panel.hidden = false;
-  if (!$("dashboard-frame").getAttribute("src"))
-    $("dashboard-frame").src = "../";
-  panel.scrollIntoView({ behavior: "smooth", block: "start" });
-};
-$("close-software").onclick = () => {
-  $("software-panel").hidden = true;
-  $("software").focus();
-};
-
 function buildScene() {
   const host = $("stage"),
     scene = new THREE.Scene();
@@ -283,11 +267,11 @@ function buildScene() {
   host.append(renderer.domElement);
   renderer.domElement.setAttribute(
     "aria-label",
-    "3D model of LogicLatch enclosure, PLC rack, conveyor and laptop",
+    "3D model of LogicLatch enclosure, PLC rack and conveyor",
   );
   renderer.domElement.setAttribute("role", "img");
   const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
-  camera.position.set(10, 8.5, 12);
+  camera.position.set(8, 7, 11);
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.target.set(0, 1, 0);
@@ -440,9 +424,15 @@ function buildScene() {
   beam.rotation.x = Math.PI / 2;
   beam.position.set(0.72, 1.78, 0.5);
   conveyor.add(beam);
-  const guideHighlight = mat(0xedb46e);
-  const obstruction = box(1.7, 0.12, 0.09, steel, 1.1, 1.85, -0.24, conveyor);
-  obstruction.visible = false;
+  // No conspicuous barrier: a hidden bearing bind is revealed only by a demo inspection.
+  const bearingMarker = new THREE.Mesh(
+    new THREE.TorusGeometry(0.17, 0.025, 10, 32),
+    new THREE.MeshBasicMaterial({ color: 0xedb46e, depthTest: false }),
+  );
+  bearingMarker.position.set(0.77, 1.45, 1.34);
+  bearingMarker.renderOrder = 5;
+  bearingMarker.visible = false;
+  conveyor.add(bearingMarker);
   // Backplane and generic PLC modules.
   const rack = pick(box(3.85, 2.7, 0.16, steel, -2.2, 2.3, -2.1), "plc");
   for (const x of [-3.9, -0.5]) {
@@ -480,7 +470,10 @@ function buildScene() {
     );
   }
   const device = new THREE.Group();
-  device.position.set(-3.55, 2.42, -1.63);
+  // Scene scale: one unit = 200 mm. STL dimensions are assumed to be millimeters.
+  // Existing local geometry was authored at .013 units/mm; apply .005/.013 uniformly.
+  device.position.set(-3.55, 2.42, -1.84);
+  device.scale.setScalar(0.005 / 0.013);
   device.rotation.y = Math.PI;
   scene.add(device);
   // Keep actual STL vertices; rotate CAD Z-up into Three.js Y-up.
@@ -524,133 +517,17 @@ function buildScene() {
   pcb.visible = false;
   cable(
     [
-      [-3.5, 1.97, -1.62],
+      [-3.55, 2.24, -1.8],
       [-3.5, 1.55, -1.5],
       [-3, 1.24, -1.8],
       [-2.6, 1.1, -1.7],
     ],
     0x242d32,
-    0.027,
+    0.012,
   );
-  label("LogicLatch / ESP32", -3.65, 3.45, -1.45, 2.2);
+  label("LogicLatch / 72 mm", -3.65, 3.0, -1.5, 1.9);
   label("CODESYS / PLC", -1.4, 3.75, -2, 2.1);
   label("PHOTOEYE", 0.72, 2.65, 1.5, 1.35);
-  // Laptop with a canvas-rendered screen driven by the same API values.
-  const laptop = new THREE.Group();
-  laptop.position.set(3.2, 1.3, -1.6);
-  laptop.rotation.y = -0.24;
-  scene.add(laptop);
-  box(2.7, 0.12, 1.8, steel, 0, -0.1, 0, laptop);
-  for (let row = 0; row < 4; row++)
-    for (let col = 0; col < 10; col++)
-      box(
-        0.17,
-        0.012,
-        0.13,
-        dark,
-        -0.97 + col * 0.215,
-        -0.028,
-        -0.3 + row * 0.18,
-        laptop,
-      );
-  box(0.65, 0.012, 0.35, dark, 0, -0.027, 0.64, laptop);
-  const screenGroup = new THREE.Group();
-  screenGroup.position.set(0, 0, -0.82);
-  screenGroup.rotation.x = -0.12;
-  laptop.add(screenGroup);
-  pick(box(2.7, 1.72, 0.09, dark, 0, 0.86, 0, screenGroup), "laptop");
-  const canvas = document.createElement("canvas");
-  canvas.width = 1024;
-  canvas.height = 640;
-  const ctx = canvas.getContext("2d"),
-    texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  const screen = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.51, 1.52),
-    new THREE.MeshBasicMaterial({ map: texture }),
-  );
-  screen.position.set(0, 0.88, 0.051);
-  screenGroup.add(screen);
-  pick(screen, "laptop");
-  box(2.8, 1.1, 0.08, dark, 3.2, 0.57, -2.35);
-  box(0.15, 1.1, 1.7, steel, 2.05, 0.55, -1.6);
-  box(0.15, 1.1, 1.7, steel, 4.35, 0.55, -1.6);
-  label("DIAGNOSTICS / FASTAPI", 3.3, 3.5, -2, 2.5);
-  function drawScreen(s) {
-    const ok = usable(s),
-      r = s?.registers || {},
-      fault = ok && r.System_Fault_Latch;
-    ctx.fillStyle = "#0c1215";
-    ctx.fillRect(0, 0, 1024, 640);
-    ctx.fillStyle = "#e4efea";
-    ctx.font = "bold 38px sans-serif";
-    ctx.fillText("LogicLatch", 38, 60);
-    ctx.fillStyle = "#cafa77";
-    ctx.font = "20px monospace";
-    ctx.fillText(
-      s?.source === "mock"
-        ? "DEMO / SIMULATED CELL"
-        : ok
-          ? "PLC SOURCE / READ ONLY"
-          : "DATA UNAVAILABLE",
-      38,
-      105,
-    );
-    ctx.fillStyle = fault ? "#ff806c" : "#dce9df";
-    ctx.font = "30px sans-serif";
-    ctx.fillText(ok ? s.machine_state : "Telemetry unavailable", 38, 168);
-    ctx.font = "bold 46px monospace";
-    ctx.fillText(
-      ok ? `${current(s).toFixed(1)} A    ${s.active_fault_code}` : "— A    —",
-      38,
-      235,
-    );
-    ctx.strokeStyle = "#566e51";
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(300, 310);
-    ctx.lineTo(300, 395);
-    ctx.lineTo(140, 395);
-    ctx.lineTo(140, 465);
-    ctx.moveTo(300, 395);
-    ctx.lineTo(460, 395);
-    ctx.lineTo(460, 465);
-    ctx.stroke();
-    for (const [x, y, text, color] of [
-      [210, 280, "PLC", fault ? "#ff806c" : "#cafa77"],
-      [40, 465, "CONVEYOR", fault ? "#ff806c" : "#cafa77"],
-      [370, 465, "SAFETY", ok && !r.Safety_OK ? "#ff806c" : "#cafa77"],
-    ]) {
-      ctx.fillStyle = "#1c292d";
-      ctx.fillRect(x, y, 190, 65);
-      ctx.strokeStyle = ok ? color : "#73838b";
-      ctx.strokeRect(x, y, 190, 65);
-      ctx.fillStyle = ok ? color : "#73838b";
-      ctx.font = "20px monospace";
-      ctx.fillText(text, x + 18, y + 41);
-    }
-    ctx.fillStyle = "#9cadaa";
-    ctx.font = "20px sans-serif";
-    ctx.fillText("DIAGNOSTIC EVIDENCE", 620, 310);
-    const lines = !ok
-      ? ["Awaiting bridge"]
-      : fault
-        ? [
-            "Sensor blocked",
-            "High motor current",
-            "Fault latch active",
-            "Sequence timeout",
-          ]
-        : ["Photoeye clear", "Safety chain healthy", "Fault latch clear"];
-    lines.forEach((t, i) => {
-      ctx.fillStyle = fault ? "#e7b6a6" : "#c0dbb7";
-      ctx.fillText(t, 620, 360 + i * 50);
-    });
-    ctx.fillStyle = "#7d9590";
-    ctx.font = "17px monospace";
-    ctx.fillText("ESP32: unobserved / Serial only", 38, 597);
-    texture.needsUpdate = true;
-  }
   let running = false,
     jammed = false,
     available = false,
@@ -663,13 +540,11 @@ function buildScene() {
     const r = s?.registers || {};
     running = available && !!r.Conveyor_Running;
     jammed = running && !!r.Sensor_Blocked && r.Motor_Current >= 80;
-    obstruction.visible = jammed;
-    obstruction.rotation.y = -0.3;
-    obstruction.material = guideInspected ? guideHighlight : steel;
+    bearingMarker.visible = jammed && driveInspected;
     if (jammed && !wasJammed) carton.position.x = 0.72;
     if (!jammed && wasJammed) carton.position.x = -2.4;
     wasJammed = jammed;
-    carton.rotation.y = jammed ? -0.28 : 0;
+    carton.rotation.y = 0;
     beam.material.color.setHex(
       !available ? 0x708086 : jammed ? 0xff6553 : 0x77df9d,
     );
@@ -677,16 +552,15 @@ function buildScene() {
     sensorLens.material = jammed ? red : available ? green : dark;
     for (const led of leds) led.material = !available ? dark : green;
     if (available && r.System_Fault_Latch) leds[0].material = red;
-    drawScreen(s);
   };
   const views = {
     overview: [
-      [10, 8.5, 12],
+      [8, 7, 11],
       [0, 1, 0],
     ],
     device: [
-      [-6.3, 4.4, 3.5],
-      [-2.8, 2.3, -1.7],
+      [-4.8, 3.1, 1.2],
+      [-3.25, 2.42, -1.7],
     ],
     conveyor: [
       [5.7, 4.7, 7],
@@ -729,7 +603,7 @@ function buildScene() {
       h = host.clientHeight;
     renderer.setSize(w, h);
     camera.aspect = w / h;
-    camera.zoom = Math.min(1, Math.max(0.4, camera.aspect / 1.15));
+    camera.zoom = Math.min(1, Math.max(0.4, camera.aspect / 0.95));
     camera.updateProjectionMatrix();
   };
   new ResizeObserver(resize).observe(host);
@@ -781,14 +655,14 @@ function buildScene() {
   sceneReady = true;
   host.dataset.ready = "true";
   $("loading").hidden = true;
-  drawScreen(state);
+
   view.update(state);
 }
 try {
   buildScene();
 } catch (error) {
   $("loading").textContent =
-    "3D could not start. This demo requires WebGL 2. The scenario controls and connected dashboard remain usable.";
+    "3D could not start. This demo requires WebGL 2. The scenario controls remain usable.";
   $("cad-badge").textContent = "3D UNAVAILABLE";
   console.error(error);
 }

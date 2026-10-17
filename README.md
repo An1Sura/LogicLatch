@@ -153,3 +153,53 @@ Modern plants rarely fail inside one clean boundary. A troubleshooting workflow 
 ## Summary
 
 Designed and implemented an industrial PLC diagnostics bridge integrating CODESYS Structured Text, Modbus TCP, Python FastAPI, WebSocket telemetry, ESP32 embedded polling, and CAD enclosure assets. Built a fixed register interface, fault simulation scenarios, and a rule-based diagnostics engine for realistic automation troubleshooting workflows.
+
+## Operator dashboard
+
+Start the bridge as above and open `http://127.0.0.1:8000/dashboard/` (the root URL redirects there). The dashboard is served by FastAPI with no Node build step, CDN, or frontend runtime dependencies. Python 3.11+ is required by the bridge; Python 3.12 is recommended for the pinned dependencies.
+
+The near-black LogicLatch dashboard includes a selectable logical topology, node inspector, all 15 register values, session motor-current samples, backend diagnostics, an event timeline, and a mock scenario lab. The layout adapts to mobile; the topology remains horizontally scrollable to preserve readable device cards.
+
+### Data contracts and limits
+
+- Every two seconds, same-origin `GET /api/state`, `GET /api/diagnostics`, and `GET /api/events` provide the displayed data. Requests time out after five seconds; polling resumes automatically. The existing `/ws/live` endpoint is unchanged.
+- `source: mock` is visibly marked **DEMO MODE**. There is no fabricated fallback when the API is unreachable. Only an already connected mock source enables `POST /api/mock/scenario`; loading a scenario affects all viewers of that backend. The frontend does not expose a switch from physical PLC operation into mock mode.
+- `connected: false` hides retained register values, current, machine state, and fault metrics. Backend diagnostics may still contain retained-register evidence; the banner explains this. A failed diagnostics/events request is shown as unavailable independently of state.
+- Motor current is `Motor_Current / 10` amperes. The chart contains at most 60 actual responses collected during this browser session, clears after disconnection/source changes, and is not persisted.
+- The bridge timestamp is a response timestamp, **not a verified PLC acquisition timestamp**. The existing bridge does not expose sample age. This dashboard cannot detect a silently stale connected backend value.
+- The topology represents the documented architecture, not discovered network inventory. Conveyor/safety nodes are PLC signal groups. ESP32 connection and readings are **unobserved**, because the firmware outputs to Serial and exposes no telemetry endpoint to FastAPI. Host addresses, latency, temperature, and uptime are not invented.
+- No reset, motion, or PLC write controls are added. Firmware, register mapping, diagnostics rules, and existing API behavior remain unchanged.
+
+### Validation
+
+```bash
+node --test tests/model.test.mjs
+pip install -r requirements-dev.txt
+python -m unittest discover -s tests -v
+```
+
+Browser integration testing requires an installed Playwright package and Chrome, plus a **mock** bridge running on port 8765:
+
+```bash
+API_HOST=127.0.0.1 API_PORT=8765 USE_MOCK_PLC=true python src/python/bridge.py
+# In another terminal; use an installed Playwright package path if not on the module path:
+PLAYWRIGHT_MODULE=/absolute/path/to/playwright SCREENSHOT_DIR=/absolute/output/directory node tests/browser.cjs
+```
+
+The browser suite changes mock scenarios and checks topology selection, diagnostics, register rows, mobile overflow, disconnected PLC handling, API outage/recovery, and console errors. Optional `DASHBOARD_URL` and `BROWSER_CHANNEL` override the test URL and browser. Screenshots use mock data; real hardware requires separate commissioning validation.
+
+## Interactive Three.js cell
+
+Open `http://127.0.0.1:8000/dashboard/demo/` after starting the bridge, or use **Interactive 3D cell** in the dashboard header. WebGL 2 is required. Three.js 0.180.0 and the OrbitControls/STLLoader addons are bundled locally with their MIT license; no CDN, npm install, or build step is needed.
+
+The scene contains the enclosure, PLC rack and conveyor only. Orbit by dragging, zoom by scrolling, and select components or camera views. **Explode enclosure** separates the actual repository STL meshes. Assuming STL units are millimeters, the enclosure bounds are approximately 46 × 55 × 72 mm. One scene unit represents 200 mm, so the conveyor is approximately 1.38 m long. The board, rack, mounting and other equipment are illustrative rather than manufacturer-verified models.
+
+### From symptom to inspection
+
+- **Run conveyor** loads `conveyor_running` (2.5 A, clear photoeye, healthy safety feedback, no fault).
+- **Introduce hidden drag** loads the existing `conveyor_jam` register scenario (9.5 A, blocked photoeye, fault 601). There is no visible barrier or angled guide. The carton stops while the mechanical cause stays concealed.
+- The right-side investigation uses the combination of signals to suggest checking mechanical resistance while retaining alternative explanations. It does not identify a bearing from register values alone.
+- **Perform simulated drive-train inspection** reveals an authored finding: one roller bearing binds under load. Only then does an amber bearing marker appear. This is not measured bearing telemetry or an automatic root-cause conclusion.
+- **Simulate roller service + reset** loads idle. Running again verifies the demo recovery: 2.5 A, clear photoeye, fault 000. Resetting the demo does not issue a hardware Reset_Command or perform a physical repair.
+
+The scene polls `/api/state` every 1.5 seconds and shares mock scenarios with the separate dashboard. Controls are disabled for unavailable/non-mock data; there is no automatic mock fallback. Reduced-motion preference suppresses conveyor animation. Physical motion, binding and inspection findings are illustrative; firmware and PLC behavior are unchanged. Browser validation covers CAD loading, the run/drag/inspect/service/restart workflow and the absence of the laptop/embedded dashboard. The existing frontend and Python contract tests also cover telemetry and static serving.

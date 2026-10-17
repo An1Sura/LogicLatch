@@ -7,12 +7,15 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import IntEnum
+from pathlib import Path
 from threading import Lock
 from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from pymodbus.client import ModbusTcpClient
 
@@ -82,6 +85,7 @@ MOCK_SCENARIOS: dict[str, list[int]] = {
     "elevator_door_fault": [0, 1, 16, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, ModeCode.ELEVATOR, 301],
     "tunnel_ventilation_fault": [0, 0, 20, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, ModeCode.TUNNEL_VENTILATION, 401],
     "garage_door_fault": [0, 1, 15, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, ModeCode.GARAGE_DOOR, 501],
+    "conveyor_running": [1, 0, 25, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, ModeCode.CONVEYOR, 0],
     "conveyor_jam": [1, 1, 95, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, ModeCode.CONVEYOR, 601],
 }
 
@@ -460,6 +464,14 @@ async def websocket_live(websocket: WebSocket) -> None:
             await asyncio.sleep(config.poll_interval_seconds)
     except WebSocketDisconnect:
         logger.info("WebSocket client disconnected")
+
+
+@app.get("/", include_in_schema=False)
+async def dashboard_redirect() -> RedirectResponse:
+    return RedirectResponse("/dashboard/")
+
+
+app.mount("/dashboard", StaticFiles(directory=Path(__file__).resolve().parents[2] / "frontend", html=True), name="dashboard")
 
 
 if __name__ == "__main__":

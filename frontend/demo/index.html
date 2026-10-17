@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>LogicLatch · Interactive cell</title>
+    <link rel="stylesheet" href="demo.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./vendor/three.module.min.js",
+          "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js",
+          "three/addons/loaders/STLLoader.js": "./vendor/STLLoader.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="../">Logic<span>Latch</span></a
+      ><span class="header-divider"></span
+      ><span class="eyebrow">INTERACTIVE CELL / 01</span
+      ><a class="back" href="../">Open dashboard ↗</a>
+    </header>
+    <main>
+      <section class="scene-panel">
+        <div class="scene-title">
+          <div class="eyebrow">FROM FIELD SIGNAL TO FAULT DIAGNOSIS</div>
+          <h1>A small device.<br />A clearer picture.</h1>
+          <p>Explore the hardware. Run the conveyor. Trace the jam.</p>
+        </div>
+        <div
+          id="stage"
+          aria-label="Interactive three dimensional industrial cell"
+        >
+          <div id="loading" role="status">
+            Loading Three.js and CAD geometry…
+          </div>
+        </div>
+        <div class="scene-badges">
+          <span id="source-badge">Connecting to bridge</span
+          ><span id="cad-badge">CAD loading</span>
+        </div>
+        <div class="view-tools" aria-label="3D camera views">
+          <button data-camera="overview" class="selected">Whole cell</button
+          ><button data-camera="device">Device & rack</button
+          ><button data-camera="conveyor">Conveyor</button
+          ><button id="explode" aria-pressed="false">Explode enclosure</button>
+        </div>
+        <div class="scene-help">
+          DRAG TO ORBIT · SCROLL TO ZOOM · CLICK A COMPONENT
+        </div>
+        <div class="selection">
+          <span id="part-label" class="eyebrow">LOGICLATCH DEVICE</span>
+          <p id="part-info">
+            The enclosure uses the actual repository STL models. ESP32
+            independently polls the PLC; its readings are not exposed to this
+            dashboard.
+          </p>
+        </div>
+      </section>
+      <aside class="console">
+        <div class="console-head">
+          <div class="eyebrow">LIVE BRIDGE / DEMO CONTROLS</div>
+          <h2>See why it stopped.</h2>
+          <p id="connection-message" role="status">
+            Waiting for the existing FastAPI bridge.
+          </p>
+        </div>
+        <div class="steps">
+          <button id="run" disabled>
+            <span>01</span><b>Run conveyor</b
+            ><small>Healthy motion · 2.5 A</small></button
+          ><button id="jam" disabled>
+            <span>02</span><b>Introduce a jam</b
+            ><small>Blocked photoeye · overload</small></button
+          ><button id="clear" disabled>
+            <span>03</span><b>Clear & reset demo</b
+            ><small>Return to healthy idle</small>
+          </button>
+        </div>
+        <div class="readings">
+          <div>
+            <span>MACHINE STATE</span><strong id="state">Unavailable</strong>
+          </div>
+          <div><span>MOTOR CURRENT</span><strong id="amps">—</strong></div>
+          <div><span>FAULT CODE</span><strong id="code">—</strong></div>
+        </div>
+        <div class="signal-list">
+          <div><span>Photoeye</span><b id="sensor">—</b></div>
+          <div><span>Safety circuit</span><b id="safety">—</b></div>
+          <div><span>Fault latch</span><b id="latch">—</b></div>
+        </div>
+        <div class="diagnosis">
+          <div class="eyebrow">WHAT THE SIGNALS TELL US</div>
+          <h3 id="diagnosis-title">Waiting for data</h3>
+          <p id="diagnosis-text">No fallback readings are generated.</p>
+          <div id="evidence"></div>
+        </div>
+        <button id="software" class="software">
+          Open connected software ↓
+        </button>
+        <div class="fine-print">
+          SIMULATED CELL · Controls change backend mock scenarios for all
+          viewers. 3D motion and the physical jam are illustrative, not measured
+          position. Hardware controls are not exposed.
+        </div>
+      </aside>
+    </main>
+    <section id="software-panel" hidden>
+      <div class="software-header">
+        <div>
+          <span class="eyebrow">THE SAME SIGNALS. THE SAME BACKEND.</span>
+          <h2>LogicLatch operator dashboard</h2>
+        </div>
+        <button id="close-software">Close dashboard ×</button>
+      </div>
+      <iframe
+        id="dashboard-frame"
+        title="Connected LogicLatch operator dashboard"
+      ></iframe>
+    </section>
+    <script type="module" src="demo.js"></script>
+  </body>
+</html>

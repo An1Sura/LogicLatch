@@ -16,6 +16,15 @@ class DashboardContractTests(unittest.TestCase):
         self.assertIn('Network topology', response.text)
         for asset in ['app.js', 'style.css', 'model.mjs']:
             self.assertEqual(self.client.get('/dashboard/' + asset).status_code, 200)
+    def test_threejs_assets_and_running_scenario(self):
+        for asset in ["", "demo.js", "demo.css", "vendor/three.module.min.js", "vendor/three.core.min.js", "vendor/STLLoader.js", "vendor/OrbitControls.js", "models/ESP32ModuleBase.stl", "models/ESP32ModuleTop.stl"]:
+            self.assertEqual(self.client.get("/dashboard/demo/" + asset).status_code, 200)
+        response = self.client.post("/api/mock/scenario", json={"scenario":"conveyor_running"})
+        state = response.json()
+        self.assertEqual(state["machine_state"], "Conveyor - Running")
+        self.assertEqual(state["registers"]["Motor_Current"], 25)
+        self.assertTrue(self.client.get("/api/diagnostics").json()["healthy"])
+
     def test_all_scenario_contracts(self):
         for scenario in MOCK_SCENARIOS:
             response = self.client.post('/api/mock/scenario', json={'scenario':scenario})

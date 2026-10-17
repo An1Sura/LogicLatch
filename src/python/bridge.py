@@ -85,6 +85,7 @@ MOCK_SCENARIOS: dict[str, list[int]] = {
     "elevator_door_fault": [0, 1, 16, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, ModeCode.ELEVATOR, 301],
     "tunnel_ventilation_fault": [0, 0, 20, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, ModeCode.TUNNEL_VENTILATION, 401],
     "garage_door_fault": [0, 1, 15, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, ModeCode.GARAGE_DOOR, 501],
+    "conveyor_running": [1, 0, 25, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, ModeCode.CONVEYOR, 0],
     "conveyor_jam": [1, 1, 95, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, ModeCode.CONVEYOR, 601],
 }
 

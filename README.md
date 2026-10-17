@@ -187,3 +187,17 @@ PLAYWRIGHT_MODULE=/absolute/path/to/playwright SCREENSHOT_DIR=/absolute/output/d
 ```
 
 The browser suite changes mock scenarios and checks topology selection, diagnostics, register rows, mobile overflow, disconnected PLC handling, API outage/recovery, and console errors. Optional `DASHBOARD_URL` and `BROWSER_CHANNEL` override the test URL and browser. Screenshots use mock data; real hardware requires separate commissioning validation.
+
+## Interactive Three.js cell
+
+Open `http://127.0.0.1:8000/dashboard/demo/` after starting the bridge, or use **Interactive 3D cell** in the dashboard header. WebGL 2 is required. Three.js 0.180.0 and the OrbitControls/STLLoader addons are bundled locally with their MIT license; the demo needs no CDN, npm install, or build step.
+
+- Orbit by dragging, zoom by scrolling, and select a component to read about it. Camera buttons focus the whole cell, rack/device, or conveyor.
+- **Explode enclosure** separates the two actual repository STL meshes. The PCB, rack, mounting, conveyor, and laptop are illustrative; enclosure assembly placement is a visualization rather than a manufacturing constraint solver.
+- **Run conveyor** loads the new additive `conveyor_running` mock scenario (25 raw current units = 2.5 A, clear sensor, healthy safety chain, no fault).
+- **Introduce a jam** loads the existing `conveyor_jam` scenario. The box stops at an illustrative obstruction, the photoeye turns red, and the bridge reports 9.5 A, fault 601, and a fault latch. This visualization is not a physics simulation or measured motion.
+- **Clear & reset demo** loads `idle`. It does not issue a physical Reset_Command.
+- **Open connected software** embeds the actual dashboard, sharing the same backend state. The laptop screen in the scene is a simplified canvas display of those values.
+- Polls `/api/state` every 1.5 seconds. Scenario controls are disabled for unavailable or non-mock data; there is no automatic mock fallback. Reduced-motion preference suppresses conveyor animation. The existing firmware and physical PLC behavior are unchanged.
+
+Frontend model and Python contract tests include the healthy-running scenario. The interactive demo has also been checked in-browser for CAD loading, run/jam/reset transitions, the shared dashboard, enclosure inspection, desktop/mobile layout, and browser errors.

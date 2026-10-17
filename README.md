@@ -201,3 +201,7 @@ Open `http://127.0.0.1:8000/dashboard/demo/` after starting the bridge, or use *
 - Polls `/api/state` every 1.5 seconds. Scenario controls are disabled for unavailable or non-mock data; there is no automatic mock fallback. Reduced-motion preference suppresses conveyor animation. The existing firmware and physical PLC behavior are unchanged.
 
 Frontend model and Python contract tests include the healthy-running scenario. The interactive demo has also been checked in-browser for CAD loading, run/jam/reset transitions, the shared dashboard, enclosure inspection, desktop/mobile layout, and browser errors.
+
+### Guided jam investigation
+
+When the demo receives the conveyor-jam signals, a right-side investigation panel explains how a shifted side guide can cause repeated jams even after a carton is removed. It explicitly distinguishes the illustrative cause from sensor evidence: the bridge has no guide-position measurement. Inspecting the suspected guide highlights it in amber and enables a simulated correction/reset. Running the conveyor afterward verifies the mock recovery (2.5 A, clear photoeye, fault 000). The panel is unavailable for physical PLC sources or missing telemetry; no hardware repair or write is performed. The exaggerated barrier has been replaced by an angled guide section. Desktop controls scroll independently so the scene remains visible.

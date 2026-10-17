@@ -365,7 +365,7 @@ iframe {
     align-items: flex-start;
   }
 }
-@media (max-width: 1000px) {
+@media (max-width: 760px) {
   header {
     padding: 0 18px;
     gap: 15px;
@@ -425,5 +425,95 @@ iframe {
   }
   iframe {
     height: 850px;
+  }
+}
+.repair-panel[hidden] {
+  display: none;
+}
+.repair-panel {
+  border: 1px solid #895548;
+  border-top: 3px solid #ff806e;
+  border-radius: 6px;
+  background: #251e1c;
+  padding: 18px;
+  margin: 20px 0;
+}
+.repair-panel h3 {
+  font-size: 20px;
+  line-height: 1.25;
+  margin: 12px 0;
+}
+.repair-panel p {
+  font-size: 12px;
+  line-height: 1.65;
+  color: #c8c1ba;
+}
+.hypothesis {
+  padding: 12px;
+  background: #352a22;
+  border: 1px solid #665039;
+  border-radius: 4px;
+}
+.hypothesis b {
+  font: 9px monospace;
+  color: #f1ca85;
+}
+.hypothesis p {
+  margin: 7px 0 0;
+  font-size: 11px;
+}
+.repair-checks {
+  padding-left: 21px;
+  margin: 18px 0;
+}
+.repair-checks li {
+  padding-left: 4px;
+  margin-bottom: 15px;
+  color: #f1c48d;
+}
+.repair-checks b {
+  display: block;
+  font-size: 12px;
+  color: #eee5d9;
+}
+.repair-checks span {
+  display: block;
+  font-size: 11px;
+  color: #bcb8b0;
+  line-height: 1.6;
+  margin-top: 5px;
+}
+.repair-panel button {
+  width: 100%;
+  font-size: 11px;
+  margin-top: 8px;
+}
+.repair-panel #repair-demo {
+  background: #c8f873;
+  color: #182012;
+  border-color: #c8f873;
+}
+.repair-panel #repair-result {
+  font-size: 11px;
+  border-top: 1px solid #51443a;
+  padding-top: 12px;
+}
+.repair-panel.recovered {
+  border-color: #9bc975;
+  background: #1d2b20;
+}
+@media (min-width: 761px) {
+  main {
+    height: calc(100vh - 76px);
+    min-height: 740px;
+  }
+  .console {
+    overflow-y: auto;
+  }
+  .scene-panel {
+    min-height: 740px;
+  }
+  .repair-panel {
+    margin-top: 18px;
   }
 }

@@ -67,6 +67,73 @@
             Waiting for the existing FastAPI bridge.
           </p>
         </div>
+        <section
+          id="repair-panel"
+          class="repair-panel"
+          hidden
+          aria-label="Guided fault investigation"
+        >
+          <div class="eyebrow">FAULT 601 / GUIDED INVESTIGATION</div>
+          <h3>Clearing the box may not fix the cause.</h3>
+          <p class="repair-summary">
+            A guide can shift inward and pinch each new box. The photoeye then
+            stays blocked because product cannot pass—not necessarily because
+            the sensor failed.
+          </p>
+          <div class="hypothesis">
+            <b>DEMO CAUSE · NOT SENSOR-CONFIRMED</b>
+            <p>
+              Misaligned side guide at the discharge. Current and blockage
+              support a mechanical restriction, but cannot identify its exact
+              location.
+            </p>
+          </div>
+          <ol class="repair-checks">
+            <li>
+              <b>Make the cell safe</b
+              ><span
+                >For real equipment, stop and isolate hazardous energy using the
+                site procedure before reaching in or adjusting a guide.</span
+              >
+            </li>
+            <li>
+              <b>Distinguish sensor trouble from drag</b
+              ><span
+                >A blocked input alone could be a photoeye issue. Here, the
+                running command and 9.5 A current also indicate load. Check for
+                a pinched carton, guide rub marks or a binding roller.</span
+              >
+            </li>
+            <li>
+              <b>Check the guide—not just the box</b
+              ><span
+                >Compare the guide gap and alignment with the approved setup. In
+                this demo the discharge guide has drifted inward; simply
+                removing the box leaves the restriction.</span
+              >
+            </li>
+            <li>
+              <b>Correct, then prove recovery</b
+              ><span
+                >Restore the approved guide position and secure its mounting.
+                Follow the site restart procedure. Verify clear photoeye, normal
+                running current and no recurring timeout.</span
+              >
+            </li>
+          </ol>
+          <button id="inspect-guide">Inspect suspected guide in 3D ↗</button>
+          <p id="inspection-result" hidden>
+            The amber guide is the scenario’s assumed cause. The backend has no
+            guide-position sensor, so this highlight is an illustration—not a
+            measured diagnosis.
+          </p>
+          <button id="repair-demo" disabled>
+            Simulate guide correction + reset
+          </button>
+          <p id="repair-result" role="status">
+            Resetting a fault alone does not correct a mechanical restriction.
+          </p>
+        </section>
         <div class="steps">
           <button id="run" disabled>
             <span>01</span><b>Run conveyor</b

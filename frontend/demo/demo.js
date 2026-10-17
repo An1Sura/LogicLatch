@@ -43,11 +43,61 @@ async function request(path, options = {}) {
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 }
+let repairStage = "none",
+  guideInspected = false,
+  previousJam = false;
 function renderState() {
   const ok = usable(state),
     mock = ok && state.source === "mock",
     r = state?.registers || {},
     jam = ok && r.Conveyor_Running && r.Sensor_Blocked && r.Motor_Current >= 80;
+  if (jam && !previousJam)
+    requestAnimationFrame(() =>
+      document
+        .querySelector(".console")
+        .scrollTo({ top: 0, behavior: "smooth" }),
+    );
+  previousJam = Boolean(jam);
+  if (
+    repairStage === "verified" &&
+    !(
+      mock &&
+      r.Conveyor_Running &&
+      !r.Sensor_Blocked &&
+      !r.System_Fault_Latch &&
+      current(state) === 2.5
+    )
+  )
+    repairStage = "none";
+  if (jam && repairStage !== "fault") {
+    repairStage = "fault";
+    guideInspected = false;
+  }
+  if (!mock) {
+    repairStage = "none";
+    guideInspected = false;
+  }
+  $("repair-panel").hidden =
+    !mock || (!jam && !["corrected", "verified"].includes(repairStage));
+  $("inspect-guide").disabled = !jam || busy;
+  $("repair-demo").disabled = !jam || !guideInspected || busy;
+  $("inspection-result").hidden = !guideInspected;
+  if (
+    repairStage === "corrected" &&
+    ok &&
+    r.Conveyor_Running &&
+    !r.Sensor_Blocked &&
+    !r.System_Fault_Latch &&
+    current(state) === 2.5
+  )
+    repairStage = "verified";
+  $("repair-result").textContent =
+    repairStage === "verified"
+      ? "DEMO RECOVERY VERIFIED: running at 2.5 A, photoeye clear, fault 000. This confirms the mock scenario only, not a physical repair."
+      : repairStage === "corrected"
+        ? "Demo guide restored; backend is idle. Click Run conveyor to verify 2.5 A, clear photoeye and fault 000."
+        : "Resetting a fault alone does not correct a mechanical restriction.";
+  $("repair-panel").classList.toggle("recovered", repairStage === "verified");
   $("source-badge").textContent = !state
     ? "API UNAVAILABLE"
     : mock
@@ -162,7 +212,33 @@ async function setScenario(scenario) {
 }
 $("run").onclick = () => setScenario("conveyor_running");
 $("jam").onclick = () => setScenario("conveyor_jam");
-$("clear").onclick = () => setScenario("idle");
+$("clear").onclick = () => {
+  repairStage = "none";
+  guideInspected = false;
+  setScenario("idle");
+};
+$("inspect-guide").onclick = () => {
+  guideInspected = true;
+  view.focus("conveyor");
+  selectPart("conveyor");
+  $("part-info").textContent =
+    "DEMO HYPOTHESIS: the amber discharge guide has shifted inward, pinching the carton. Inspect alignment and clearance; a blocked photoeye alone does not prove a failed sensor.";
+  renderState();
+};
+$("repair-demo").onclick = async () => {
+  if (!guideInspected || busy || !usable(state) || state.source !== "mock")
+    return;
+  await setScenario("idle");
+  if (
+    usable(state) &&
+    state.source === "mock" &&
+    state.active_fault_code === 0
+  ) {
+    repairStage = "corrected";
+    renderState();
+  }
+};
+
 $("explode").onclick = () => {
   exploded = !exploded;
   $("explode").setAttribute("aria-pressed", String(exploded));
@@ -364,7 +440,8 @@ function buildScene() {
   beam.rotation.x = Math.PI / 2;
   beam.position.set(0.72, 1.78, 0.5);
   conveyor.add(beam);
-  const obstruction = box(0.16, 0.28, 1.35, red, 1.28, 1.65, 0.5, conveyor);
+  const guideHighlight = mat(0xedb46e);
+  const obstruction = box(1.7, 0.12, 0.09, steel, 1.1, 1.85, -0.24, conveyor);
   obstruction.visible = false;
   // Backplane and generic PLC modules.
   const rack = pick(box(3.85, 2.7, 0.16, steel, -2.2, 2.3, -2.1), "plc");
@@ -587,6 +664,8 @@ function buildScene() {
     running = available && !!r.Conveyor_Running;
     jammed = running && !!r.Sensor_Blocked && r.Motor_Current >= 80;
     obstruction.visible = jammed;
+    obstruction.rotation.y = -0.3;
+    obstruction.material = guideInspected ? guideHighlight : steel;
     if (jammed && !wasJammed) carton.position.x = 0.72;
     if (!jammed && wasJammed) carton.position.x = -2.4;
     wasJammed = jammed;

@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>LogicLatch · Network intelligence</title>
+    <link rel="stylesheet" href="/dashboard/style.css" />
+  </head>
+  <body>
+    <aside class="rail">
+      <a class="brand" href="/dashboard/" aria-label="LogicLatch home"
+        >L<span>↳</span></a
+      ><button
+        class="rail-active"
+        title="Network topology"
+        data-view="topology"
+      >
+        ⌘</button
+      ><button title="Register telemetry" data-view="telemetry">▥</button
+      ><button title="Diagnostics" data-view="diagnostics">⚡</button
+      ><span class="rail-bottom">LL<br />01</span>
+    </aside>
+    <div class="shell">
+      <header>
+        <div class="wordmark">
+          LogicLatch<span> / CONTROL INTELLIGENCE</span>
+        </div>
+        <div id="connection" class="badge">Connecting</div>
+      </header>
+      <main>
+        <div class="heading">
+          <div>
+            <div class="eyebrow">WORKSPACE / INDUSTRIAL CELL 01</div>
+            <h1>See the signal.<br /><span>Find the fault.</span></h1>
+            <p>One connected view from control logic to the field.</p>
+          </div>
+          <div class="heading-right">
+            <span class="eyebrow">DATA SOURCE</span
+            ><strong id="source">Awaiting bridge</strong
+            ><span id="updated">No response received</span
+            ><button id="refresh">↻ Refresh data</button>
+          </div>
+        </div>
+        <div id="notice" role="status" class="notice">
+          Connecting to the LogicLatch bridge…
+        </div>
+        <section class="metrics">
+          <div>
+            <span>PLC CONNECTION</span><strong id="plc">—</strong
+            ><small>Modbus TCP · 15 holding registers</small>
+          </div>
+          <div>
+            <span>MACHINE STATE</span><strong id="machine">Unavailable</strong
+            ><small>Derived from PLC register values</small>
+          </div>
+          <div>
+            <span>ACTIVE FAULT</span><strong id="fault">—</strong
+            ><small id="fault-name">Awaiting register data</small>
+          </div>
+          <div>
+            <span>MOTOR CURRENT</span><strong id="current">— <em>A</em></strong
+            ><small>Register 02 · scaled × 0.1</small>
+          </div>
+        </section>
+        <div class="workspace">
+          <section class="panel topology-panel">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">SYSTEM OVERVIEW</span>
+                <h2>Network topology <span class="count">05 NODES</span></h2>
+              </div>
+              <div class="legend">
+                <span class="green">●</span> Healthy
+                <span class="red">●</span> Fault
+                <span class="gray">●</span> Unobserved
+              </div>
+            </div>
+            <div class="tabs" role="tablist">
+              <button class="active" data-view="topology" role="tab">
+                Topology</button
+              ><button data-view="telemetry" role="tab">
+                Register telemetry</button
+              ><button data-view="diagnostics" role="tab">
+                Diagnostics <span id="finding-count">—</span>
+              </button>
+            </div>
+            <div id="topology" class="view">
+              <div class="map">
+                <svg
+                  class="wires"
+                  viewBox="0 0 800 460"
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M400 110V225M400 225H155V340M400 225H645V340M400 225V340"
+                  />
+                  <path class="wire-dashed" d="M400 225H645V340" /></svg
+                ><span class="edge-label e1">MODBUS TCP</span
+                ><span class="edge-label e2">PLC SIGNALS</span
+                ><span class="edge-label e3">REGISTER SIGNALS</span
+                ><span class="edge-label e4">INDEPENDENT POLLING</span>
+                <button class="node bridge" data-device="bridge">
+                  <span class="node-icon">⌘</span
+                  ><span
+                    ><small>DATA GATEWAY</small><b>FastAPI bridge</b
+                    ><em id="bridge-status">Awaiting response</em></span
+                  ><i></i>
+                </button>
+                <button class="node controller selected" data-device="plc">
+                  <span class="node-icon">▤</span
+                  ><span
+                    ><small>CONTROLLER · 01</small><b>CODESYS PLC</b
+                    ><em id="node-plc">Unavailable</em></span
+                  ><i></i>
+                </button>
+                <button class="node conveyor" data-device="conveyor">
+                  <span class="node-icon">⇥</span
+                  ><span
+                    ><small>FIELD SIGNAL GROUP</small><b>Conveyor drive</b
+                    ><em id="node-conveyor">Unavailable</em></span
+                  ><i></i>
+                </button>
+                <button class="node safety" data-device="safety">
+                  <span class="node-icon">◇</span
+                  ><span
+                    ><small>FIELD SIGNAL GROUP</small><b>Safety circuit</b
+                    ><em id="node-safety">Unavailable</em></span
+                  ><i></i>
+                </button>
+                <button class="node esp" data-device="esp">
+                  <span class="node-icon">▦</span
+                  ><span
+                    ><small>EMBEDDED CLIENT</small><b>ESP32 module</b
+                    ><em>Unobserved · Serial only</em></span
+                  ><i></i>
+                </button>
+              </div>
+              <div class="map-footer">
+                <span>⌖ Logical architecture · select a node to inspect</span
+                ><span>FIELD / EDGE / APPLICATION</span>
+              </div>
+            </div>
+            <div id="telemetry" class="view" hidden>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ADDRESS</th>
+                      <th>REGISTER / TAG</th>
+                      <th>RAW VALUE</th>
+                    </tr>
+                  </thead>
+                  <tbody id="registers"></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="diagnostics" class="view" hidden>
+              <div id="findings" class="findings"></div>
+            </div>
+          </section>
+          <aside class="panel detail">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">NODE INSPECTOR</span>
+                <h2 id="detail-title">CODESYS PLC</h2>
+              </div>
+              <span>↗</span>
+            </div>
+            <div class="detail-body">
+              <div id="detail-status" class="badge">Unavailable</div>
+              <p id="detail-description"></p>
+              <dl id="detail-values"></dl>
+              <div class="subheading">
+                PLC MOTOR CURRENT <span>SESSION SAMPLES</span>
+              </div>
+              <svg
+                id="chart"
+                viewBox="0 0 280 90"
+                role="img"
+                aria-label="Motor current samples from this browser session"
+              ></svg>
+              <div class="chart-label">
+                <span id="chart-caption">Awaiting connected samples</span
+                ><span>A</span>
+              </div>
+              <div class="inspector-note">
+                Topology describes the project architecture. Field nodes
+                represent PLC signals, not independently monitored network
+                devices.
+              </div>
+            </div>
+          </aside>
+        </div>
+        <section class="bottom-grid">
+          <div class="panel events">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">BRIDGE ACTIVITY</span>
+                <h2>Event timeline</h2>
+              </div>
+              <span class="count">LATEST 6</span>
+            </div>
+            <div id="events" class="event-list">Awaiting events</div>
+          </div>
+          <div class="panel demo">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">CONTROLLED SIMULATION</span>
+                <h2>Fault lab</h2>
+              </div>
+              <span class="badge amber">MOCK ONLY</span>
+            </div>
+            <p>Load a backend scenario to trace a fault across the system.</p>
+            <div class="scenario-row">
+              <select id="scenario" aria-label="Mock scenario">
+                <option value="idle">Healthy / idle</option>
+                <option value="conveyor_jam">Conveyor jam</option>
+                <option value="pump_station_failure">
+                  Pump station failure
+                </option>
+                <option value="traffic_phase_conflict">
+                  Traffic phase conflict
+                </option>
+                <option value="elevator_door_fault">Elevator door fault</option>
+                <option value="tunnel_ventilation_fault">
+                  Tunnel ventilation fault
+                </option>
+                <option value="garage_door_fault">
+                  Garage door fault
+                </option></select
+              ><button id="load" disabled>Load scenario ↗</button>
+            </div>
+            <small id="demo-help"
+              >Available only when the bridge reports a mock source.</small
+            >
+          </div>
+        </section>
+        <footer>
+          <span>LOGICLATCH / INDUSTRIAL DIAGNOSTICS BRIDGE</span
+          ><span>OBSERVE. ISOLATE. RESOLVE.</span>
+        </footer>
+      </main>
+    </div>
+    <script type="module" src="/dashboard/app.js"></script>
+  </body>
+</html>

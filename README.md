@@ -153,3 +153,37 @@ Modern plants rarely fail inside one clean boundary. A troubleshooting workflow 
 ## Summary
 
 Designed and implemented an industrial PLC diagnostics bridge integrating CODESYS Structured Text, Modbus TCP, Python FastAPI, WebSocket telemetry, ESP32 embedded polling, and CAD enclosure assets. Built a fixed register interface, fault simulation scenarios, and a rule-based diagnostics engine for realistic automation troubleshooting workflows.
+
+## Operator dashboard
+
+Start the bridge as above and open `http://127.0.0.1:8000/dashboard/` (the root URL redirects there). The dashboard is served by FastAPI with no Node build step, CDN, or frontend runtime dependencies. Python 3.11+ is required by the bridge; Python 3.12 is recommended for the pinned dependencies.
+
+The near-black LogicLatch dashboard includes a selectable logical topology, node inspector, all 15 register values, session motor-current samples, backend diagnostics, an event timeline, and a mock scenario lab. The layout adapts to mobile; the topology remains horizontally scrollable to preserve readable device cards.
+
+### Data contracts and limits
+
+- Every two seconds, same-origin `GET /api/state`, `GET /api/diagnostics`, and `GET /api/events` provide the displayed data. Requests time out after five seconds; polling resumes automatically. The existing `/ws/live` endpoint is unchanged.
+- `source: mock` is visibly marked **DEMO MODE**. There is no fabricated fallback when the API is unreachable. Only an already connected mock source enables `POST /api/mock/scenario`; loading a scenario affects all viewers of that backend. The frontend does not expose a switch from physical PLC operation into mock mode.
+- `connected: false` hides retained register values, current, machine state, and fault metrics. Backend diagnostics may still contain retained-register evidence; the banner explains this. A failed diagnostics/events request is shown as unavailable independently of state.
+- Motor current is `Motor_Current / 10` amperes. The chart contains at most 60 actual responses collected during this browser session, clears after disconnection/source changes, and is not persisted.
+- The bridge timestamp is a response timestamp, **not a verified PLC acquisition timestamp**. The existing bridge does not expose sample age. This dashboard cannot detect a silently stale connected backend value.
+- The topology represents the documented architecture, not discovered network inventory. Conveyor/safety nodes are PLC signal groups. ESP32 connection and readings are **unobserved**, because the firmware outputs to Serial and exposes no telemetry endpoint to FastAPI. Host addresses, latency, temperature, and uptime are not invented.
+- No reset, motion, or PLC write controls are added. Firmware, register mapping, diagnostics rules, and existing API behavior remain unchanged.
+
+### Validation
+
+```bash
+node --test tests/model.test.mjs
+pip install -r requirements-dev.txt
+python -m unittest discover -s tests -v
+```
+
+Browser integration testing requires an installed Playwright package and Chrome, plus a **mock** bridge running on port 8765:
+
+```bash
+API_HOST=127.0.0.1 API_PORT=8765 USE_MOCK_PLC=true python src/python/bridge.py
+# In another terminal; use an installed Playwright package path if not on the module path:
+PLAYWRIGHT_MODULE=/absolute/path/to/playwright SCREENSHOT_DIR=/absolute/output/directory node tests/browser.cjs
+```
+
+The browser suite changes mock scenarios and checks topology selection, diagnostics, register rows, mobile overflow, disconnected PLC handling, API outage/recovery, and console errors. Optional `DASHBOARD_URL` and `BROWSER_CHANNEL` override the test URL and browser. Screenshots use mock data; real hardware requires separate commissioning validation.

@@ -1,0 +1,643 @@
+{
+  "dataset": "synthetic_v1; 8 s episodes, 50 ms scans, injection at 3 s",
+  "episodes": 70,
+  "true_positive_episodes": 50,
+  "false_positive_episodes": 0,
+  "precision": 1.0,
+  "recall": 1.0,
+  "healthy_false_alarm_rate": 0.0,
+  "baseline_healthy_false_alarm_rate": 0.5,
+  "max_detection_latency_seconds": 1.05,
+  "details": [
+    {
+      "seed": 0,
+      "scenario": "healthy_conveyor",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": true
+    },
+    {
+      "seed": 0,
+      "scenario": "healthy_pump",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": false
+    },
+    {
+      "seed": 0,
+      "scenario": "conveyor_jam",
+      "expected": "conveyor_obstruction",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 0,
+      "scenario": "photoeye_stuck",
+      "expected": "photoeye_persistently_blocked",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 1.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 0,
+      "scenario": "motor_overload",
+      "expected": "motor_load_abnormal",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 0,
+      "scenario": "safety_trip",
+      "expected": "safety_chain_open",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 0,
+      "scenario": "pump_station_failure",
+      "expected": "level_feedback_conflict",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": false
+    },
+    {
+      "seed": 1,
+      "scenario": "healthy_conveyor",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": true
+    },
+    {
+      "seed": 1,
+      "scenario": "healthy_pump",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": false
+    },
+    {
+      "seed": 1,
+      "scenario": "conveyor_jam",
+      "expected": "conveyor_obstruction",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 1,
+      "scenario": "photoeye_stuck",
+      "expected": "photoeye_persistently_blocked",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 1.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 1,
+      "scenario": "motor_overload",
+      "expected": "motor_load_abnormal",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 1,
+      "scenario": "safety_trip",
+      "expected": "safety_chain_open",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 1,
+      "scenario": "pump_station_failure",
+      "expected": "level_feedback_conflict",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": false
+    },
+    {
+      "seed": 2,
+      "scenario": "healthy_conveyor",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": true
+    },
+    {
+      "seed": 2,
+      "scenario": "healthy_pump",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": false
+    },
+    {
+      "seed": 2,
+      "scenario": "conveyor_jam",
+      "expected": "conveyor_obstruction",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 2,
+      "scenario": "photoeye_stuck",
+      "expected": "photoeye_persistently_blocked",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 1.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 2,
+      "scenario": "motor_overload",
+      "expected": "motor_load_abnormal",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 2,
+      "scenario": "safety_trip",
+      "expected": "safety_chain_open",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 2,
+      "scenario": "pump_station_failure",
+      "expected": "level_feedback_conflict",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": false
+    },
+    {
+      "seed": 3,
+      "scenario": "healthy_conveyor",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": true
+    },
+    {
+      "seed": 3,
+      "scenario": "healthy_pump",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": false
+    },
+    {
+      "seed": 3,
+      "scenario": "conveyor_jam",
+      "expected": "conveyor_obstruction",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 3,
+      "scenario": "photoeye_stuck",
+      "expected": "photoeye_persistently_blocked",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 1.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 3,
+      "scenario": "motor_overload",
+      "expected": "motor_load_abnormal",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 3,
+      "scenario": "safety_trip",
+      "expected": "safety_chain_open",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 3,
+      "scenario": "pump_station_failure",
+      "expected": "level_feedback_conflict",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": false
+    },
+    {
+      "seed": 4,
+      "scenario": "healthy_conveyor",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": true
+    },
+    {
+      "seed": 4,
+      "scenario": "healthy_pump",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": false
+    },
+    {
+      "seed": 4,
+      "scenario": "conveyor_jam",
+      "expected": "conveyor_obstruction",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 4,
+      "scenario": "photoeye_stuck",
+      "expected": "photoeye_persistently_blocked",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 1.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 4,
+      "scenario": "motor_overload",
+      "expected": "motor_load_abnormal",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 4,
+      "scenario": "safety_trip",
+      "expected": "safety_chain_open",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 4,
+      "scenario": "pump_station_failure",
+      "expected": "level_feedback_conflict",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": false
+    },
+    {
+      "seed": 5,
+      "scenario": "healthy_conveyor",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": true
+    },
+    {
+      "seed": 5,
+      "scenario": "healthy_pump",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": false
+    },
+    {
+      "seed": 5,
+      "scenario": "conveyor_jam",
+      "expected": "conveyor_obstruction",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 5,
+      "scenario": "photoeye_stuck",
+      "expected": "photoeye_persistently_blocked",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 1.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 5,
+      "scenario": "motor_overload",
+      "expected": "motor_load_abnormal",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 5,
+      "scenario": "safety_trip",
+      "expected": "safety_chain_open",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 5,
+      "scenario": "pump_station_failure",
+      "expected": "level_feedback_conflict",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": false
+    },
+    {
+      "seed": 6,
+      "scenario": "healthy_conveyor",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": true
+    },
+    {
+      "seed": 6,
+      "scenario": "healthy_pump",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": false
+    },
+    {
+      "seed": 6,
+      "scenario": "conveyor_jam",
+      "expected": "conveyor_obstruction",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 6,
+      "scenario": "photoeye_stuck",
+      "expected": "photoeye_persistently_blocked",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 1.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 6,
+      "scenario": "motor_overload",
+      "expected": "motor_load_abnormal",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 6,
+      "scenario": "safety_trip",
+      "expected": "safety_chain_open",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 6,
+      "scenario": "pump_station_failure",
+      "expected": "level_feedback_conflict",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": false
+    },
+    {
+      "seed": 7,
+      "scenario": "healthy_conveyor",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": true
+    },
+    {
+      "seed": 7,
+      "scenario": "healthy_pump",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": false
+    },
+    {
+      "seed": 7,
+      "scenario": "conveyor_jam",
+      "expected": "conveyor_obstruction",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 7,
+      "scenario": "photoeye_stuck",
+      "expected": "photoeye_persistently_blocked",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 1.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 7,
+      "scenario": "motor_overload",
+      "expected": "motor_load_abnormal",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 7,
+      "scenario": "safety_trip",
+      "expected": "safety_chain_open",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 7,
+      "scenario": "pump_station_failure",
+      "expected": "level_feedback_conflict",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": false
+    },
+    {
+      "seed": 8,
+      "scenario": "healthy_conveyor",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": true
+    },
+    {
+      "seed": 8,
+      "scenario": "healthy_pump",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": false
+    },
+    {
+      "seed": 8,
+      "scenario": "conveyor_jam",
+      "expected": "conveyor_obstruction",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 8,
+      "scenario": "photoeye_stuck",
+      "expected": "photoeye_persistently_blocked",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 1.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 8,
+      "scenario": "motor_overload",
+      "expected": "motor_load_abnormal",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 8,
+      "scenario": "safety_trip",
+      "expected": "safety_chain_open",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 8,
+      "scenario": "pump_station_failure",
+      "expected": "level_feedback_conflict",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": false
+    },
+    {
+      "seed": 9,
+      "scenario": "healthy_conveyor",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": true
+    },
+    {
+      "seed": 9,
+      "scenario": "healthy_pump",
+      "expected": null,
+      "detected": false,
+      "false_positive": false,
+      "latency_seconds": null,
+      "baseline_alert": false
+    },
+    {
+      "seed": 9,
+      "scenario": "conveyor_jam",
+      "expected": "conveyor_obstruction",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 9,
+      "scenario": "photoeye_stuck",
+      "expected": "photoeye_persistently_blocked",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 1.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 9,
+      "scenario": "motor_overload",
+      "expected": "motor_load_abnormal",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.25,
+      "baseline_alert": true
+    },
+    {
+      "seed": 9,
+      "scenario": "safety_trip",
+      "expected": "safety_chain_open",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": true
+    },
+    {
+      "seed": 9,
+      "scenario": "pump_station_failure",
+      "expected": "level_feedback_conflict",
+      "detected": true,
+      "false_positive": false,
+      "latency_seconds": 0.05,
+      "baseline_alert": false
+    }
+  ]
+}

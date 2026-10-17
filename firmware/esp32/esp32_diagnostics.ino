@@ -125,7 +125,7 @@ void pollHoldingRegisters() {
 void setup() {
   Serial.begin(115200);
   delay(500);
-  Serial.println("LogicLatch ESP32 Diagnostics Client");
+  Serial.println("Resolvyn ESP32 Diagnostics Client");
   connectWiFi();
 }
 

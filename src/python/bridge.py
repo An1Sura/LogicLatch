@@ -7,7 +7,9 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import IntEnum
-from threading import Lock
+from threading import RLock
+from time import monotonic
+from contextlib import asynccontextmanager
 from typing import Any
 
 from dotenv import load_dotenv
@@ -15,6 +17,8 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from pymodbus.client import ModbusTcpClient
+from reasoning import EvidenceEngine
+from simulation import CellSimulator, SCENARIOS
 
 load_dotenv()
 
@@ -22,7 +26,7 @@ logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
-logger = logging.getLogger("logiclatch")
+logger = logging.getLogger("resolvyn")
 
 REGISTER_COUNT = 15
 
@@ -93,7 +97,18 @@ class BridgeConfig:
     plc_unit_id: int = int(os.getenv("PLC_UNIT_ID", "1"))
     poll_interval_seconds: float = float(os.getenv("POLL_INTERVAL_SECONDS", "1.0"))
     use_mock_plc: bool = os.getenv("USE_MOCK_PLC", "true").lower() in {"1", "true", "yes", "on"}
+    stale_after_seconds: float = float(os.getenv("STALE_AFTER_SECONDS", "3.0"))
     initial_mock_scenario: str = os.getenv("INITIAL_MOCK_SCENARIO", "idle")
+
+
+    def __post_init__(self):
+        if self.poll_interval_seconds <= 0 or self.stale_after_seconds <= 0:
+            raise ValueError("Polling and stale intervals must be positive")
+
+
+class SimulationRequest(BaseModel):
+    scenario: str = 'healthy_conveyor'
+    seed: int = 1
 
 
 class ScenarioRequest(BaseModel):
@@ -119,6 +134,10 @@ class DiagnosticsResponse(BaseModel):
 class PLCState(BaseModel):
     timestamp: str
     connected: bool
+    sample_timestamp: str | None = None
+    sample_age_seconds: float | None = None
+    data_quality: str = "good"
+    sequence: int = 0
     source: str
     registers: dict[str, int]
     raw_registers: list[int]
@@ -131,13 +150,21 @@ class PLCBridge:
     def __init__(self, config: BridgeConfig) -> None:
         self.config = config
         self._client = ModbusTcpClient(host=config.plc_host, port=config.plc_port, timeout=2.0)
-        self._lock = Lock()
+        self._lock = RLock()
+        self._io_lock = RLock()
+        self._sample_time = None
+        self._sample_timestamp = None
+        self._sequence = 0
+        self._engine = EvidenceEngine(max_gap=config.stale_after_seconds)
+        self._simulator = None
         initial = MOCK_SCENARIOS.get(config.initial_mock_scenario, MOCK_SCENARIOS["idle"])
         self._registers = [int(value) for value in initial]
         self._connected = config.use_mock_plc
         self._source = "mock" if config.use_mock_plc else "modbus"
         self._last_fault_code = self._registers[14]
         self._events: deque[dict[str, Any]] = deque(maxlen=200)
+        if config.use_mock_plc:
+            self._stamp_sample()
         self._record_event("bridge_started", f"Diagnostics bridge started using {self._source} source.")
 
     def state(self) -> PLCState:
@@ -145,11 +172,21 @@ class PLCBridge:
             registers = list(self._registers)
             connected = self._connected
             source = self._source
+            age = None if self._sample_time is None else monotonic() - self._sample_time
+            quality = 'unavailable' if age is None else 'stale' if age > self.config.stale_after_seconds else 'good'
+            if not connected:
+                quality = 'unavailable'
+            sample_timestamp = self._sample_timestamp
+            sequence = self._sequence
 
         fault_code = registers[14]
         return PLCState(
             timestamp=utc_now(),
             connected=connected,
+            sample_timestamp=sample_timestamp,
+            sample_age_seconds=age,
+            data_quality=quality,
+            sequence=sequence,
             source=source,
             registers={REGISTER_MAP[index]: registers[index] for index in range(REGISTER_COUNT)},
             raw_registers=registers,
@@ -162,7 +199,35 @@ class PLCBridge:
         with self._lock:
             return list(self._events)
 
+    def _stamp_sample(self):
+        self._sample_time = monotonic()
+        self._sample_timestamp = utc_now()
+        self._sequence += 1
+        self._engine.observe(self._sequence, self._sample_time, self._registers)
+
+    def root_cause(self):
+        with self._lock:
+            state = self.state()
+            return self._engine.analyze(state.connected and state.data_quality == 'good')
+
+    def set_simulation(self, scenario: str, seed: int = 1):
+        if not self.config.use_mock_plc:
+            raise PermissionError('Simulation controls are disabled for live PLC connections')
+        simulator = CellSimulator(scenario=scenario, seed=seed)
+        with self._lock:
+            self._simulator = simulator
+            self._source = 'simulation'
+            self._engine.reset()
+            self._registers = simulator.scan()
+            self._connected = True
+            self._stamp_sample()
+            self._evaluate_fault_transition()
+            self._record_event('simulation_started', f'Scenario={scenario}, seed={seed}')
+        return self.state()
+
     def set_mock_scenario(self, scenario: str) -> PLCState:
+        if not self.config.use_mock_plc:
+            raise PermissionError('Mock controls are disabled for live PLC connections')
         if scenario not in MOCK_SCENARIOS:
             raise ValueError(f"Unsupported scenario '{scenario}'.")
 
@@ -170,57 +235,61 @@ class PLCBridge:
             self._registers = [int(value) for value in MOCK_SCENARIOS[scenario]]
             self._connected = True
             self._source = "mock"
-            self._last_fault_code = self._registers[14]
+            self._simulator = None
+            self._engine.reset()
+            self._stamp_sample()
+            self._evaluate_fault_transition()
             self._record_event("mock_scenario_loaded", f"Loaded mock scenario '{scenario}'.")
 
         return self.state()
 
     async def poll_forever(self) -> None:
         while True:
+            interval = self.config.poll_interval_seconds
             try:
-                if self._source == "mock" or self.config.use_mock_plc:
-                    self._evaluate_fault_transition()
+                if self.config.use_mock_plc:
+                    with self._lock:
+                        if self._simulator:
+                            self._registers = self._simulator.scan()
+                            interval = self._simulator.scan_seconds
+                        self._stamp_sample()
+                        self._evaluate_fault_transition()
                 else:
-                    self.poll_modbus_once()
+                    await asyncio.to_thread(self.poll_modbus_once)
             except Exception:
+                self._set_connection_state(False)
                 logger.exception("PLC polling cycle failed")
-            await asyncio.sleep(self.config.poll_interval_seconds)
+            await asyncio.sleep(interval)
 
     def poll_modbus_once(self) -> None:
-        if not self._client.connected and not self._client.connect():
-            self._set_connection_state(False)
-            return
+        with self._io_lock:
+            try:
+                if not self._client.connected and not self._client.connect():
+                    self._set_connection_state(False)
+                    return
+                response = self._client.read_holding_registers(
+                    address=0, count=REGISTER_COUNT, slave=self.config.plc_unit_id)
+                if response.isError():
+                    raise ValueError(str(response))
+                values = list(response.registers)
+                if len(values) != REGISTER_COUNT or any(type(v) is not int or not 0 <= v <= 65535 for v in values):
+                    raise ValueError('Invalid register frame')
+                if any(values[i] not in (0, 1) for i in range(13) if i != 2):
+                    raise ValueError('Invalid boolean register')
+                with self._lock:
+                    self._registers = values
+                    self._set_connection_state(True)
+                    self._source = 'modbus'
+                    self._stamp_sample()
+                    self._evaluate_fault_transition()
+            except Exception as exc:
+                self._set_connection_state(False)
+                self._client.close()
+                self._record_event('modbus_error', str(exc))
 
-        try:
-            response = self._client.read_holding_registers(
-                address=0,
-                count=REGISTER_COUNT,
-                slave=self.config.plc_unit_id,
-            )
-        except TypeError:
-            response = self._client.read_holding_registers(
-                address=0,
-                count=REGISTER_COUNT,
-                unit=self.config.plc_unit_id,
-            )
-
-        if response.isError():
-            self._set_connection_state(False)
-            self._record_event("modbus_error", str(response))
-            return
-
-        values = [int(value) for value in response.registers[:REGISTER_COUNT]]
-        if len(values) != REGISTER_COUNT:
-            self._set_connection_state(False)
-            self._record_event("modbus_error", f"Expected 15 registers but received {len(values)}.")
-            return
-
-        with self._lock:
-            self._registers = values
-            self._connected = True
-            self._source = "modbus"
-
-        self._evaluate_fault_transition()
+    def close(self):
+        with self._io_lock:
+            self._client.close()
 
     def _set_connection_state(self, connected: bool) -> None:
         with self._lock:
@@ -228,6 +297,8 @@ class PLCBridge:
                 state = "connected" if connected else "disconnected"
                 self._record_event("connection_state_changed", f"PLC Modbus client {state}.")
             self._connected = connected
+            if not connected:
+                self._engine.reset()
 
     def _evaluate_fault_transition(self) -> None:
         with self._lock:
@@ -238,13 +309,12 @@ class PLCBridge:
                 self._last_fault_code = fault_code
 
     def _record_event(self, event_type: str, message: str) -> None:
-        self._events.appendleft(
-            {
+        with self._lock:
+            self._events.appendleft({
                 "timestamp": utc_now(),
                 "type": event_type,
                 "message": message,
-            }
-        )
+            })
 
 
 def utc_now() -> str:
@@ -273,16 +343,22 @@ def run_diagnostics(state: PLCState) -> DiagnosticsResponse:
     findings: list[DiagnosticFinding] = []
     fault_code = state.active_fault_code
 
-    if not state.connected:
+    if not state.connected or state.data_quality != "good":
         findings.append(
             DiagnosticFinding(
                 severity="critical",
                 code=-1,
                 title="PLC communication unavailable",
-                evidence=[f"Source '{state.source}' is not connected."],
+                evidence=[f"Source {state.source}: connected={state.connected}, quality={state.data_quality}."],
                 recommendation="Verify PLC power, IP address, Modbus TCP server configuration, firewall rules, and network cabling.",
             )
         )
+
+    if findings:
+        # Old register values remain visible for inspection, never as current diagnosis.
+        return DiagnosticsResponse(timestamp=utc_now(), healthy=False,
+            machine_state='Unknown - telemetry unavailable', active_fault_code=fault_code,
+            findings=findings)
 
     if bool_reg(r, 10):
         findings.append(
@@ -387,31 +463,40 @@ def run_diagnostics(state: PLCState) -> DiagnosticsResponse:
 
 config = BridgeConfig()
 bridge = PLCBridge(config)
+
+
+@asynccontextmanager
+async def lifespan(app):
+    task = asyncio.create_task(bridge.poll_forever())
+    try:
+        yield
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        await asyncio.to_thread(bridge.close)
+
+
 app = FastAPI(
-    title="LogicLatch",
+    lifespan=lifespan,
+    title="Resolvyn",
     description="Industrial diagnostics bridge for CODESYS, Modbus TCP, FastAPI, and ESP32 demos.",
-    version="1.0.0",
+    version="0.2.0",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=["http://127.0.0.1:8000", "http://localhost:8000"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-async def startup() -> None:
-    asyncio.create_task(bridge.poll_forever())
 
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
     state = bridge.state()
     return {
-        "status": "ok" if state.connected else "degraded",
+        "status": "ok" if state.connected and state.data_quality == "good" else "degraded",
         "timestamp": utc_now(),
         "plc_connected": state.connected,
         "source": state.source,
@@ -437,11 +522,28 @@ async def api_diagnostics() -> DiagnosticsResponse:
 async def api_mock_scenario(request: ScenarioRequest) -> PLCState:
     try:
         return bridge.set_mock_scenario(request.scenario)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(
             status_code=400,
             detail={"message": str(exc), "supported_scenarios": sorted(MOCK_SCENARIOS)},
         ) from exc
+
+
+@app.get('/api/root-cause')
+async def api_root_cause():
+    return bridge.root_cause()
+
+
+@app.post('/api/simulation', response_model=PLCState)
+async def api_simulation(request: SimulationRequest):
+    try:
+        return bridge.set_simulation(request.scenario, request.seed)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail={'message': str(exc), 'scenarios': SCENARIOS}) from exc
 
 
 @app.websocket("/ws/live")
@@ -455,6 +557,7 @@ async def websocket_live(websocket: WebSocket) -> None:
                 {
                     "state": state.model_dump(),
                     "diagnostics": diagnostics.model_dump(),
+                    "root_cause": bridge.root_cause(),
                 }
             )
             await asyncio.sleep(config.poll_interval_seconds)
@@ -467,7 +570,7 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "bridge:app",
-        host=os.getenv("API_HOST", "0.0.0.0"),
+        host=os.getenv("API_HOST", "127.0.0.1"),
         port=int(os.getenv("API_PORT", "8000")),
         reload=False,
     )

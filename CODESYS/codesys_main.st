@@ -1,6 +1,7 @@
 PROGRAM PLC_PRG
 VAR
     ScenarioLoader : FB_ScenarioDemoLoader;
+    ResetPermitted : BOOL;
 END_VAR
 
 ScenarioLoader(
@@ -14,11 +15,21 @@ IF ScenarioLoader.Done THEN
     GVL_Scenario.LoadScenario := FALSE;
 END_IF
 
+(* Demo reset guard only; this is NOT a safety-rated controller.
+   Field fault inputs must clear externally. Stop wins and reset cannot start motion. *)
+ResetPermitted := GVL_Diagnostics.Safety_OK
+    AND GVL_Diagnostics.Stop_Command
+    AND NOT GVL_Diagnostics.Start_Command
+    AND NOT GVL_Diagnostics.HVAC_Fault
+    AND NOT (GVL_Diagnostics.Tank_Level_Low AND GVL_Diagnostics.Tank_Level_High)
+    AND NOT (GVL_Diagnostics.Sensor_Blocked AND (GVL_Diagnostics.Motor_Current >= 80));
+
 IF GVL_Diagnostics.Reset_Command THEN
-    GVL_Diagnostics.System_Fault_Latch := FALSE;
-    GVL_Diagnostics.Sequence_Timeout := FALSE;
-    GVL_Diagnostics.HVAC_Fault := FALSE;
-    GVL_Diagnostics.Fault_Code := GVL_Constants.FAULT_NONE;
+    IF ResetPermitted THEN
+        GVL_Diagnostics.System_Fault_Latch := FALSE;
+        GVL_Diagnostics.Sequence_Timeout := FALSE;
+        GVL_Diagnostics.Fault_Code := GVL_Constants.FAULT_NONE;
+    END_IF
     GVL_Diagnostics.Reset_Command := FALSE;
 END_IF
 

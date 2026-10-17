@@ -1,8 +1,69 @@
-# LogicLatch
+# Resolvyn
+
+Resolvyn evolves the LogicLatch diagnostics demo into a reproducible PLC simulation
+and evidence-based troubleshooting lab. This is a development prototype: dynamic
+conveyor/pump models and temporal rules are implemented; trained AI, production
+hardware validation and the operator dashboard are proposed work.
+
+## Run without hardware
+
+Python 3.11 or 3.12 is recommended for the pinned dependencies.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+python -m pytest -q
+python src/python/evaluate.py
+python src/python/bridge.py
+```
+
+Open `http://127.0.0.1:8000/docs` for the interactive API. With default mock mode:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/simulation \
+  -H 'Content-Type: application/json' \
+  -d '{"scenario":"conveyor_jam","seed":1}'
+curl http://127.0.0.1:8000/api/root-cause
+```
+
+The simulation trips after an injected fault at 3 seconds. Query while it runs for
+live hypotheses; after the trip, inspect `last_supported_observation` for historical
+pre-trip evidence. This is distinct from the legacy immediate `/api/diagnostics`
+alerts. Available dynamic scenarios: `healthy_conveyor`, `conveyor_jam`,
+`photoeye_stuck`, `motor_overload`, `safety_trip`, `healthy_pump`,
+`pump_station_failure`. Starting a new scenario resets the simulated cell; the API
+never sends a reset to a PLC.
+
+### Exercise the real Modbus path
+
+Run these in separate terminals after activating the environment:
+
+```bash
+python src/python/simulator_server.py --scenario conveyor_jam --port 1502
+```
+
+```bash
+USE_MOCK_PLC=false PLC_HOST=127.0.0.1 PLC_PORT=1502 \
+  POLL_INTERVAL_SECONDS=0.05 python src/python/bridge.py
+```
+
+Start the bridge first if you want its evidence history to include startup and the
+fault onset. The server binds loopback, unit 1, read-only holding registers 0–14.
+Mock/simulation controls return 403 in live mode. The 50 ms polling interval is for
+this local lab; the ordinary default is 1 second and may miss short transients.
+The API defaults to localhost and is not authenticated for remote deployment.
+
+[Audit, hardware assessment and phased verification](docs/RESOLVYN_PLAN.md) explain
+what is implemented, the simulation limits, and remaining production work.
+[Per-episode synthetic measurements](docs/evaluation.json) are reproducible and are
+not claims of real-world AI accuracy or downtime savings.
+
+## Original components and compatibility
 
 ## Project Overview
 
-LogicLatch is an industrial diagnostics bridge that connects PLC logic, Modbus TCP data, a Python API layer, and an embedded ESP32 client into one coherent troubleshooting system. It is built to demonstrate how real automation faults can be surfaced, classified, and explained across controls and software boundaries.
+Resolvyn is an industrial diagnostics bridge that connects PLC logic, Modbus TCP data, a Python API layer, and an embedded ESP32 client into one coherent troubleshooting system. It is built to demonstrate how real automation faults can be surfaced, classified, and explained across controls and software boundaries.
 
 The project models a small industrial cell where CODESYS publishes machine status through holding registers, FastAPI converts raw register values into useful diagnostics, and an ESP32 client independently polls the same PLC data for embedded field visibility.
 
@@ -30,7 +91,7 @@ ESP32 Embedded Client
 - CODESYS Structured Text logic for machine state, fault latches, and scenario loading.
 - Fixed Modbus TCP holding register map from address `0` through `14`.
 - Python FastAPI bridge with live polling, diagnostics, event history, mock scenarios, and WebSocket streaming.
-- Rule-based diagnostics engine for common industrial fault modes.
+- Legacy instantaneous alerts plus temporal, evidence-ranked diagnostic hypotheses.
 - ESP32 WiFi client that polls PLC holding registers and prints decoded values to Serial.
 - CAD enclosure assets for a small ESP32 diagnostics module.
 - Repository layout suitable for an engineering portfolio or practical controls/software integration demo.
@@ -120,7 +181,7 @@ curl -X POST http://127.0.0.1:8000/api/mock/scenario \
 ## Folder Structure
 
 ```text
-logiclatch/
+resolvyn/
 ├── README.md
 ├── requirements.txt
 ├── .env.example
@@ -152,4 +213,4 @@ Modern plants rarely fail inside one clean boundary. A troubleshooting workflow 
 
 ## Summary
 
-Designed and implemented an industrial PLC diagnostics bridge integrating CODESYS Structured Text, Modbus TCP, Python FastAPI, WebSocket telemetry, ESP32 embedded polling, and CAD enclosure assets. Built a fixed register interface, fault simulation scenarios, and a rule-based diagnostics engine for realistic automation troubleshooting workflows.
+The original demo supplied an industrial PLC diagnostics bridge integrating CODESYS Structured Text, Modbus TCP, Python FastAPI, WebSocket telemetry, ESP32 embedded polling, and CAD enclosure assets. Built a fixed register interface, fault simulation scenarios, and a rule-based diagnostics engine for realistic automation troubleshooting workflows.

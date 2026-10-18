@@ -3,18 +3,23 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import hmac
+import math
+import json
+import sqlite3
+from pathlib import Path
+from contextlib import asynccontextmanager
 from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import IntEnum
-from threading import Lock
-from typing import Any
+from threading import RLock
+from typing import Annotated, Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from pymodbus.client import ModbusTcpClient
 
 load_dotenv()
 
@@ -88,12 +93,40 @@ MOCK_SCENARIOS: dict[str, list[int]] = {
 
 @dataclass(frozen=True)
 class BridgeConfig:
-    plc_host: str = os.getenv("PLC_HOST", "127.0.0.1")
-    plc_port: int = int(os.getenv("PLC_PORT", "502"))
-    plc_unit_id: int = int(os.getenv("PLC_UNIT_ID", "1"))
     poll_interval_seconds: float = float(os.getenv("POLL_INTERVAL_SECONDS", "1.0"))
-    use_mock_plc: bool = os.getenv("USE_MOCK_PLC", "true").lower() in {"1", "true", "yes", "on"}
+    use_mock_plc: bool = os.getenv("USE_MOCK_PLC", "false").lower() in {"1", "true", "yes", "on"}
     initial_mock_scenario: str = os.getenv("INITIAL_MOCK_SCENARIO", "idle")
+    device_id: str = os.getenv("ESP32_DEVICE_ID", "logiclatch-01")
+    ingest_token: str = os.getenv("INGEST_TOKEN", "")
+    stale_after_seconds: float = float(os.getenv("STALE_AFTER_SECONDS", "15"))
+    database_path: str = os.getenv("DATABASE_PATH", "data/telemetry.sqlite3")
+    history_limit: int = 10000
+
+    def __post_init__(self) -> None:
+        if (not math.isfinite(self.poll_interval_seconds) or not math.isfinite(self.stale_after_seconds)
+                or self.poll_interval_seconds <= 0 or self.stale_after_seconds <= 0 or self.history_limit < 1):
+            raise ValueError("Intervals and history_limit must be positive")
+
+
+RegisterValue = Annotated[int, Field(strict=True, ge=0, le=65535)]
+
+
+class TelemetryRequest(BaseModel):
+    device_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")
+    boot_id: int = Field(strict=True, ge=1, le=4294967295)
+    sequence: int = Field(strict=True, ge=1, le=4294967295)
+    uptime_ms: int = Field(strict=True, ge=0)
+    plc_connected: bool = Field(strict=True)
+    registers: list[RegisterValue] | None = Field(default=None, min_length=15, max_length=15)
+    wifi_rssi: int = Field(strict=True, ge=-127, le=0)
+    free_heap: int = Field(strict=True, ge=0)
+    queue_depth: int = Field(strict=True, ge=0)
+    dropped_samples: int = Field(strict=True, ge=0)
+    last_fault_code: int = Field(default=0, strict=True, ge=0, le=65535)
+    storage_ready: bool = Field(default=True, strict=True)
+    replayed: bool = Field(default=False, strict=True)
+    sample_age_ms: int = Field(default=0, strict=True, ge=0)
+    sampled_at: str | None = None
 
 
 class ScenarioRequest(BaseModel):
@@ -125,126 +158,119 @@ class PLCState(BaseModel):
     machine_state: str
     active_fault_code: int
     active_fault_name: str
+    gateway: dict[str, Any] | None = None
 
 
 class PLCBridge:
+    """Single-machine telemetry receiver. The ESP32 is the only live PLC reader."""
+
     def __init__(self, config: BridgeConfig) -> None:
         self.config = config
-        self._client = ModbusTcpClient(host=config.plc_host, port=config.plc_port, timeout=2.0)
-        self._lock = Lock()
-        initial = MOCK_SCENARIOS.get(config.initial_mock_scenario, MOCK_SCENARIOS["idle"])
-        self._registers = [int(value) for value in initial]
-        self._connected = config.use_mock_plc
-        self._source = "mock" if config.use_mock_plc else "modbus"
-        self._last_fault_code = self._registers[14]
+        self._lock = RLock()
+        Path(config.database_path).parent.mkdir(parents=True, exist_ok=True)
+        self._db = sqlite3.connect(config.database_path, check_same_thread=False)
+        self._db.execute("PRAGMA journal_mode=WAL")
+        self._db.executescript("""
+            CREATE TABLE IF NOT EXISTS telemetry (
+                device_id TEXT, boot_id INTEGER, sequence INTEGER,
+                received_at TEXT NOT NULL, payload TEXT NOT NULL,
+                PRIMARY KEY (device_id, boot_id, sequence)
+            );
+            CREATE TABLE IF NOT EXISTS latest (
+                device_id TEXT PRIMARY KEY, received_at TEXT NOT NULL, payload TEXT NOT NULL
+            );
+        """)
         self._events: deque[dict[str, Any]] = deque(maxlen=200)
-        self._record_event("bridge_started", f"Diagnostics bridge started using {self._source} source.")
+        self._mock = config.initial_mock_scenario
+        self._record_event("bridge_started", "Waiting for ESP32 telemetry." if not config.use_mock_plc else "Mock mode enabled.")
+
+    def close(self) -> None:
+        self._db.close()
+
+    def _latest(self) -> tuple[str, dict[str, Any]] | None:
+        row = self._db.execute("SELECT received_at, payload FROM latest WHERE device_id = ?", (self.config.device_id,)).fetchone()
+        return (row[0], json.loads(row[1])) if row else None
+
+    def ingest(self, packet: TelemetryRequest) -> dict[str, Any]:
+        if packet.device_id != self.config.device_id:
+            raise ValueError("Unknown device_id")
+        if packet.plc_connected != (packet.registers is not None):
+            raise ValueError("Connected samples require 15 registers; disconnected samples require null registers")
+        now = utc_now()
+        payload = packet.model_dump()
+        with self._lock, self._db:
+            existing = self._db.execute(
+                "SELECT 1 FROM telemetry WHERE device_id=? AND boot_id=? AND sequence=?",
+                (packet.device_id, packet.boot_id, packet.sequence),
+            ).fetchone()
+            if existing:
+                return {"accepted": True, "duplicate": True, "live_updated": False}
+            previous = self._latest()
+            newer = previous is None or (packet.boot_id, packet.sequence) > (previous[1]["boot_id"], previous[1]["sequence"])
+            live = newer and not packet.replayed and packet.sample_age_ms < self.config.stale_after_seconds * 1000
+            self._db.execute("INSERT INTO telemetry VALUES (?, ?, ?, ?, ?)",
+                             (packet.device_id, packet.boot_id, packet.sequence, now, json.dumps(payload)))
+            if live:
+                # A failed PLC poll invalidates connectivity, but preserves the last known values.
+                payload["last_registers"] = packet.registers or (previous[1].get("last_registers") if previous else None)
+                self._db.execute("INSERT OR REPLACE INTO latest VALUES (?, ?, ?)",
+                                 (packet.device_id, now, json.dumps(payload)))
+                old_fault = (previous[1].get("last_registers") or [0] * 15)[14] if previous else 0
+                if packet.registers is not None and packet.registers[14] != old_fault:
+                    self._record_event("fault_code_changed", f"Fault changed to {packet.registers[14]}.")
+                if previous is None or packet.plc_connected != previous[1]["plc_connected"]:
+                    self._record_event("connection_state_changed", f"ESP32 reports PLC connected={packet.plc_connected}.")
+            self._db.execute("DELETE FROM telemetry WHERE rowid NOT IN (SELECT rowid FROM telemetry ORDER BY rowid DESC LIMIT ?)",
+                             (self.config.history_limit,))
+        return {"accepted": True, "duplicate": False, "live_updated": live}
 
     def state(self) -> PLCState:
         with self._lock:
-            registers = list(self._registers)
-            connected = self._connected
-            source = self._source
-
+            latest = self._latest()
+            gateway = None
+            if self.config.use_mock_plc:
+                registers = list(MOCK_SCENARIOS.get(self._mock, MOCK_SCENARIOS["idle"]))
+                connected, source = True, "mock"
+            elif latest:
+                received_at, payload = latest
+                age = max(0, (datetime.now(UTC) - datetime.fromisoformat(received_at)).total_seconds()) + payload["sample_age_ms"] / 1000
+                stale = age >= self.config.stale_after_seconds
+                registers = payload.get("last_registers") or [0] * REGISTER_COUNT
+                connected, source = payload["plc_connected"] and not stale, "esp32"
+                gateway = {k: v for k, v in payload.items() if k not in {"registers", "last_registers"}}
+                gateway.update(received_at=received_at, age_seconds=age, stale=stale)
+            else:
+                registers, connected, source = [0] * REGISTER_COUNT, False, "esp32"
         fault_code = registers[14]
         return PLCState(
-            timestamp=utc_now(),
-            connected=connected,
-            source=source,
-            registers={REGISTER_MAP[index]: registers[index] for index in range(REGISTER_COUNT)},
-            raw_registers=registers,
-            machine_state=detect_machine_state(registers),
-            active_fault_code=fault_code,
-            active_fault_name=FAULT_NAMES.get(fault_code, "Unknown fault"),
+            timestamp=utc_now(), connected=connected, source=source,
+            registers={REGISTER_MAP[i]: registers[i] for i in range(REGISTER_COUNT)},
+            raw_registers=registers, machine_state=detect_machine_state(registers),
+            active_fault_code=fault_code, active_fault_name=FAULT_NAMES.get(fault_code, "Unknown fault"),
+            gateway=gateway,
         )
+
+    def history(self, limit: int) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self._db.execute("SELECT received_at, payload FROM telemetry ORDER BY rowid DESC LIMIT ?", (limit,)).fetchall()
+            return [{"received_at": row[0], **json.loads(row[1])} for row in rows]
 
     def events(self) -> list[dict[str, Any]]:
         with self._lock:
             return list(self._events)
 
     def set_mock_scenario(self, scenario: str) -> PLCState:
+        if not self.config.use_mock_plc:
+            raise ValueError("Mock scenarios are disabled in ESP32 mode")
         if scenario not in MOCK_SCENARIOS:
             raise ValueError(f"Unsupported scenario '{scenario}'.")
-
         with self._lock:
-            self._registers = [int(value) for value in MOCK_SCENARIOS[scenario]]
-            self._connected = True
-            self._source = "mock"
-            self._last_fault_code = self._registers[14]
+            self._mock = scenario
             self._record_event("mock_scenario_loaded", f"Loaded mock scenario '{scenario}'.")
-
         return self.state()
 
-    async def poll_forever(self) -> None:
-        while True:
-            try:
-                if self._source == "mock" or self.config.use_mock_plc:
-                    self._evaluate_fault_transition()
-                else:
-                    self.poll_modbus_once()
-            except Exception:
-                logger.exception("PLC polling cycle failed")
-            await asyncio.sleep(self.config.poll_interval_seconds)
-
-    def poll_modbus_once(self) -> None:
-        if not self._client.connected and not self._client.connect():
-            self._set_connection_state(False)
-            return
-
-        try:
-            response = self._client.read_holding_registers(
-                address=0,
-                count=REGISTER_COUNT,
-                slave=self.config.plc_unit_id,
-            )
-        except TypeError:
-            response = self._client.read_holding_registers(
-                address=0,
-                count=REGISTER_COUNT,
-                unit=self.config.plc_unit_id,
-            )
-
-        if response.isError():
-            self._set_connection_state(False)
-            self._record_event("modbus_error", str(response))
-            return
-
-        values = [int(value) for value in response.registers[:REGISTER_COUNT]]
-        if len(values) != REGISTER_COUNT:
-            self._set_connection_state(False)
-            self._record_event("modbus_error", f"Expected 15 registers but received {len(values)}.")
-            return
-
-        with self._lock:
-            self._registers = values
-            self._connected = True
-            self._source = "modbus"
-
-        self._evaluate_fault_transition()
-
-    def _set_connection_state(self, connected: bool) -> None:
-        with self._lock:
-            if self._connected != connected:
-                state = "connected" if connected else "disconnected"
-                self._record_event("connection_state_changed", f"PLC Modbus client {state}.")
-            self._connected = connected
-
-    def _evaluate_fault_transition(self) -> None:
-        with self._lock:
-            fault_code = self._registers[14]
-            if fault_code != self._last_fault_code:
-                fault_name = FAULT_NAMES.get(fault_code, "Unknown fault")
-                self._record_event("fault_code_changed", f"Fault changed to {fault_code}: {fault_name}.")
-                self._last_fault_code = fault_code
-
     def _record_event(self, event_type: str, message: str) -> None:
-        self._events.appendleft(
-            {
-                "timestamp": utc_now(),
-                "type": event_type,
-                "message": message,
-            }
-        )
+        self._events.appendleft({"timestamp": utc_now(), "type": event_type, "message": message})
 
 
 def utc_now() -> str:
@@ -280,7 +306,7 @@ def run_diagnostics(state: PLCState) -> DiagnosticsResponse:
                 code=-1,
                 title="PLC communication unavailable",
                 evidence=[f"Source '{state.source}' is not connected."],
-                recommendation="Verify PLC power, IP address, Modbus TCP server configuration, firewall rules, and network cabling.",
+                recommendation="Check ESP32 power, Wi-Fi, telemetry uploads, and its Modbus connection to the PLC.",
             )
         )
 
@@ -387,7 +413,14 @@ def run_diagnostics(state: PLCState) -> DiagnosticsResponse:
 
 config = BridgeConfig()
 bridge = PLCBridge(config)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    bridge.close()
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="LogicLatch",
     description="Industrial diagnostics bridge for CODESYS, Modbus TCP, FastAPI, and ESP32 demos.",
     version="1.0.0",
@@ -402,9 +435,25 @@ app.add_middleware(
 )
 
 
-@app.on_event("startup")
-async def startup() -> None:
-    asyncio.create_task(bridge.poll_forever())
+@app.post("/api/telemetry")
+def api_telemetry(packet: TelemetryRequest, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+    if not config.ingest_token:
+        raise HTTPException(status_code=503, detail="Configure INGEST_TOKEN before accepting telemetry")
+    if not hmac.compare_digest((authorization or "").encode(), f"Bearer {config.ingest_token}".encode()):
+        raise HTTPException(status_code=401, detail="Invalid ingestion token")
+    if config.use_mock_plc:
+        raise HTTPException(status_code=409, detail="Disable USE_MOCK_PLC to accept ESP32 telemetry")
+    try:
+        return bridge.ingest(packet)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/history")
+def api_history(limit: int = 100) -> dict[str, Any]:
+    if not 1 <= limit <= 1000:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 1000")
+    return {"samples": bridge.history(limit)}
 
 
 @app.get("/health")
@@ -466,7 +515,7 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "bridge:app",
+        app,
         host=os.getenv("API_HOST", "0.0.0.0"),
         port=int(os.getenv("API_PORT", "8000")),
         reload=False,
